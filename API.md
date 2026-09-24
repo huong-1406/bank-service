@@ -26,7 +26,8 @@
 | `400` | Dữ liệu sai, hoặc vi phạm ràng buộc nghiệp vụ |
 | `401` | Chưa đăng nhập, token sai hoặc hết hạn, sai mật khẩu |
 | `404` | Không tìm thấy — **hoặc tài nguyên không thuộc về mình** |
-| `409` | Xung đột — email đã tồn tại, hoặc hai giao dịch ghi cùng lúc |
+| `405` | Sai phương thức HTTP |
+| `409` | Xung đột — email hoặc số điện thoại đã tồn tại, hoặc hai giao dịch ghi cùng lúc |
 
 > **Vì sao truy cập tài nguyên của người khác trả `404` chứ không phải `403`?**
 > Trả `403` là vô tình xác nhận "thẻ id này có tồn tại, chỉ là không phải của anh". Kẻ xấu dò được id nào có thật. Trả `404` thì không lộ gì.
@@ -77,8 +78,12 @@ Riêng lỗi validate có thêm `fieldErrors`:
 | `UNAUTHORIZED` | 401 | Thiếu token, token sai hoặc hết hạn |
 | `ACCOUNT_NOT_FOUND` | 404 | Không tìm thấy tài khoản |
 | `CARD_NOT_FOUND` | 404 | Không tìm thấy thẻ, hoặc thẻ không thuộc về mình |
+| `NOT_FOUND` | 404 | Đường dẫn không tồn tại |
+| `METHOD_NOT_ALLOWED` | 405 | Gọi sai phương thức, ví dụ `GET /balance/deposit` |
 | `EMAIL_ALREADY_EXISTS` | 409 | Email đã được đăng ký |
+| `PHONE_ALREADY_EXISTS` | 409 | Số điện thoại đã được đăng ký |
 | `CONCURRENT_UPDATE` | 409 | Hai giao dịch ghi cùng lúc, thử lại |
+| `INTERNAL_ERROR` | 500 | Lỗi hệ thống không lường trước — xem log `bank-service` |
 
 ---
 
@@ -128,7 +133,7 @@ Không cần token.
 **Request**
 
 ```json
-{ "email": "a@test.com", "password": "password123" }
+{ "email": "a@test.com", "password": "Test@1234" }
 ```
 
 **Response `200`**
@@ -179,6 +184,7 @@ Không cần token. Tự tạo số dư = 0.
 | Lỗi | Mã |
 |---|---|
 | Email đã tồn tại | `409 EMAIL_ALREADY_EXISTS` |
+| Số điện thoại đã tồn tại | `409 PHONE_ALREADY_EXISTS` |
 | Dữ liệu sai định dạng | `400 VALIDATION_FAILED` |
 
 > Không trả về `password`, kể cả dạng hash.
@@ -222,6 +228,8 @@ Chỉ sửa được email và số điện thoại. Xoá cache sau khi sửa.
 | Lỗi | Mã |
 |---|---|
 | Email mới đã có người dùng | `409 EMAIL_ALREADY_EXISTS` |
+| Số điện thoại mới đã có người dùng | `409 PHONE_ALREADY_EXISTS` |
+| Sai định dạng, hoặc không gửi trường nào | `400 VALIDATION_FAILED` |
 
 > Không cho sửa `customerName` và `password` qua API này — đề bài chỉ yêu cầu email và số điện thoại.
 
@@ -341,7 +349,7 @@ Cập nhật lại cache Redis ngay, không chờ TTL.
 
 ### 11. `POST /balance/withdraw` — Rút tiền
 
-**Bắt buộc có thẻ** và thẻ phải `ACTIVE`.
+**Bắt buộc có thẻ** và thẻ phải **hợp lệ**: `ACTIVE` **và** chưa hết hạn.
 
 **Request**
 
@@ -387,7 +395,7 @@ Bất đồng bộ. Trả về **`202`**, không phải `200` — vì lúc trả
 | Lỗi | Mã |
 |---|---|
 | Số dư khả dụng không đủ | `400 INSUFFICIENT_BALANCE` |
-| Thẻ không `ACTIVE` | `400 CARD_NOT_ACTIVE` |
+| Thẻ `INACTIVE` hoặc đã hết hạn | `400 CARD_NOT_ACTIVE` |
 | Thẻ không phải của mình | `404 CARD_NOT_FOUND` |
 
 **Việc xảy ra bên trong:** ghi `Transaction` = `PENDING` → chuyển `amount` từ `availableBalance` sang `holdBalance` → gọi HTTP sang `payment-service` → nhận `202` thì đánh `Transaction` = `COMPLETED` và trừ `holdBalance` → trả `202` cho client.
@@ -444,13 +452,16 @@ Frontend dựng 10 màn bằng dữ liệu giả theo đúng hình dạng trên,
 
 ## 7. Dữ liệu mẫu để test
 
-Theo `DATABASE.md` §10. Mật khẩu chung: `password123`.
+Theo `DATABASE.md` §10. Mật khẩu chung: **`Test@1234`**.
 
-| Email | Số dư | Thẻ | Dùng để test |
-|---|---|---|---|
-| `a@test.com` | 1.000.000 | 1 thẻ `ACTIVE` (id 10) | Case thành công |
-| `b@test.com` | 0 | không có | Xoá tài khoản thành công |
-| `c@test.com` | 500.000 | 1 thẻ `INACTIVE` (id 12) | Rút tiền bị chặn |
+| Email | SĐT | Số dư | Thẻ | Dùng để test |
+|---|---|---|---|---|
+| `a@test.com` | `0900000001` | 1.000.000 | 1 thẻ `ACTIVE`, hạn 2030-12-31 | Case thành công |
+| `b@test.com` | `0900000002` | 0 | không có | Xoá tài khoản thành công |
+| `c@test.com` | `0900000003` | 500.000 | 1 thẻ `INACTIVE` | Rút tiền bị chặn vì thẻ tắt |
+| `d@test.com` | `0900000004` | 500.000 | 1 thẻ `ACTIVE`, hạn **2020-01-31** | Rút tiền bị chặn vì thẻ **hết hạn** |
+
+> **id thẻ không cố định** — id tự tăng, dựng lại database là đổi. Trong Postman, gọi `GET /accounts/me/cards` rồi lưu `cardId` vào biến, đừng gõ cứng.
 
 ### Case thất bại bắt buộc có trong Postman
 
@@ -468,6 +479,7 @@ Theo `DATABASE.md` §10. Mật khẩu chung: `password123`.
 | 8 | Xoá thẻ của người khác → 404 |
 | 9 | Token sai chữ ký → 401 |
 | 10 | `amount` = 0 → 400 |
-| 11 | Rút bằng thẻ `INACTIVE` → 400 |
+| 11 | Rút bằng thẻ `INACTIVE` (C) → 400 |
+| 11 | Rút bằng thẻ hết hạn (D) → 400 |
 | 11 | Rút quá số dư → 400 |
 | 12 | Thanh toán quá số dư → 400 |
