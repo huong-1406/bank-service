@@ -6,7 +6,7 @@ spring:
     name: bank-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/bank_service
+    url: jdbc:postgresql://${DB_HOST:localhost}:5432/bank_service
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:root}
     driver-class-name: org.postgresql.Driver
