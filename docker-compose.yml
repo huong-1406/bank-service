@@ -1,18 +1,55 @@
 services:
-  postgres:
+  # Mỗi service một Postgres riêng (database per service).
+  postgres-bank:
     image: postgres:16-alpine
-    container_name: bank-service-postgres
+    container_name: postgres-bank
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-root}
-      POSTGRES_DB: bank_service
+      POSTGRES_DB: bank_db
     ports:
       - "5432:5432"
     volumes:
       - bank-service-postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d bank_service"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d bank_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-payment:
+    image: postgres:16-alpine
+    container_name: postgres-payment
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-root}
+      POSTGRES_DB: payment_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - payment-service-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d payment_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres-notification:
+    image: postgres:16-alpine
+    container_name: postgres-notification
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-root}
+      POSTGRES_DB: notification_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - notification-service-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-postgres} -d notification_db"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -43,8 +80,108 @@ services:
       - "8161:8161"
     volumes:
       - bank-service-activemq-data:/opt/apache-activemq/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs -u $$ACTIVEMQ_ADMIN_LOGIN:$$ACTIVEMQ_ADMIN_PASSWORD http://localhost:8161/admin/ > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # Mỗi service một container riêng: một service chết không kéo service khác theo.
+  # depends_on chỉ trỏ vào hạ tầng, không trỏ giữa các app với nhau.
+  bank-service:
+    build:
+      context: .
+      dockerfile: bank-service/Dockerfile
+    image: bank-service:latest
+    container_name: bank-service
+    restart: unless-stopped
+    mem_limit: 768m
+    environment:
+      DB_HOST: postgres-bank
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-change-this-secret-change-this-secret}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres-bank:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: payment-service/Dockerfile
+    image: payment-service:latest
+    container_name: payment-service
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      DB_HOST: postgres-payment
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      ACTIVEMQ_BROKER_URL: tcp://activemq:61616
+      ACTIVEMQ_USER: ${ACTIVEMQ_USER:-admin}
+      ACTIVEMQ_PASSWORD: ${ACTIVEMQ_PASSWORD:-admin}
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres-payment:
+        condition: service_healthy
+      activemq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    image: notification-service:latest
+    container_name: notification-service
+    restart: unless-stopped
+    mem_limit: 512m
+    environment:
+      DB_HOST: postgres-notification
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+      ACTIVEMQ_BROKER_URL: tcp://activemq:61616
+      ACTIVEMQ_USER: ${ACTIVEMQ_USER:-admin}
+      ACTIVEMQ_PASSWORD: ${ACTIVEMQ_PASSWORD:-admin}
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres-notification:
+        condition: service_healthy
+      activemq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8082/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
 
 volumes:
   bank-service-postgres-data:
+  payment-service-postgres-data:
+  notification-service-postgres-data:
   bank-service-redis-data:
   bank-service-activemq-data:

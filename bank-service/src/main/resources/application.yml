@@ -6,7 +6,7 @@ spring:
     name: bank-service
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:5432/bank_service
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/bank_db
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:root}
     driver-class-name: org.postgresql.Driver
@@ -34,6 +34,12 @@ spring:
     broker-url: ${ACTIVEMQ_BROKER_URL:tcp://localhost:61616}
     user: ${ACTIVEMQ_USER:admin}
     password: ${ACTIVEMQ_PASSWORD:admin}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
 
 jwt:
   secret: ${JWT_SECRET:change-this-secret-change-this-secret-change-this-secret}
