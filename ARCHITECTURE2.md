@@ -56,29 +56,31 @@ Ngoài ra, các quyết định khác đã chốt trong lúc rà đề bài:
 └────────────────────────────────┼──────────────────────────────────────┘
           │            │         │ HTTP (RestClient)
           │            │         ▼
-     ┌────▼────┐  ┌────▼────┐  ┌──────────────────────────┐
-     │Postgres │  │  Redis  │  │ payment-service   :8081   │
-     │  :5432  │  │  :6379  │  │ nhận HTTP → đẩy message   │
-     └─────────┘  └─────────┘  └────────────┬──────────────┘
+  ┌───────▼──────┐ ┌───▼─────┐ ┌──────────────────────────┐   ┌──────────────────┐
+  │postgres-bank │ │  Redis  │ │ payment-service   :8081   │──►│ postgres-payment │
+  │bank_db :5432 │ │  :6379  │ │ nhận HTTP → đẩy message   │   │ payment_db :5433 │
+  └──────────────┘ └─────────┘ └────────────┬──────────────┘   └──────────────────┘
                                              │ JMS send
                                   ┌──────────▼──────────┐
                                   │   ActiveMQ  :61616   │
                                   │  queue payment.queue │
                                   └──────────┬──────────┘
                                              │ JMS consume
-                               ┌─────────────▼──────────────────┐
-                               │ notification-service   :8082    │
-                               │ log "Payment confirmed for      │
-                               │      paymentId: 12345"          │
+                               ┌─────────────▼──────────────────┐   ┌───────────────────────┐
+                               │ notification-service   :8082    │──►│ postgres-notification │
+                               │ log "Payment confirmed for      │   │ notification_db :5434 │
+                               │      paymentId: 12345"          │   └───────────────────────┘
                                └─────────────────────────────────┘
 ```
+
+> **Mỗi service một database riêng**, mỗi database một container riêng, port trên máy khác nhau (5432 / 5433 / 5434). Service nào chỉ kết nối database của service đó — chi tiết ở `DATABASE.md` §0.
 
 | Thành phần | Port | Stack | Có DB? | Có Redis? | Có JWT? | Số file ước tính |
 |---|---|---|---|---|---|---|
 | `frontend` | 3000 | React + Vite + nginx | ❌ | ❌ | giữ token | ~25 |
-| `bank-service` | 8080 | Spring Boot | ✅ Postgres | ✅ | ✅ | ~42 |
-| `payment-service` | 8081 | Spring Boot | ❌ | ❌ | ❌ | ~6 |
-| `notification-service` | 8082 | Spring Boot | ❌ | ❌ | ❌ | ~4 |
+| `bank-service` | 8080 | Spring Boot | ✅ `bank_db` :5432 | ✅ | ✅ | ~42 |
+| `payment-service` | 8081 | Spring Boot | ✅ `payment_db` :5433 | ❌ | ❌ | ~9 |
+| `notification-service` | 8082 | Spring Boot | ✅ `notification_db` :5434 | ❌ | ❌ | ~7 |
 
 > 2 service phụ rất nhẹ — gần như chỉ có boilerplate. Toàn bộ khối lượng backend nằm ở `bank-service`.
 > `frontend` là project **Node/React riêng**, không nằm trong Maven multi-module, build bằng `npm`.
@@ -136,7 +138,7 @@ Giữ nguyên từ v1 — đây là phần đề bài chấm kỹ nhất (§1.3)
 bank-system/                          ← pom cha, packaging=pom
 │
 ├── pom.xml                           ← <modules> gom 3 service
-├── docker-compose.yml                ← 7 service: 3 hạ tầng + 3 backend + 1 frontend
+├── docker-compose.yml                ← 9 service: 5 hạ tầng (3 Postgres + Redis + ActiveMQ) + 3 backend + 1 frontend
 ├── ARCHITECTURE2.md
 │
 ├── bank-service/                     ← :8080 — toàn bộ nghiệp vụ
@@ -216,7 +218,7 @@ bank-system/                          ← pom cha, packaging=pom
                     │ accountId (PK)         │
                     │ customerName           │
                     │ email        (unique)  │
-                    │ phoneNumber            │
+                    │ phoneNumber  (unique)  │
                     │ password     (BCrypt)  │
                     └───────────┬─────┬──────┘
                     1─1  │      │1─*  │1─*
@@ -283,7 +285,7 @@ Nhờ vậy `holdBalance` có ý nghĩa thật và chặn được double-spend.
 | `id` | BIGSERIAL | ✗ | PK |
 | `customer_name` | VARCHAR(100) | ✗ | |
 | `email` | VARCHAR(150) | ✗ | **UNIQUE** — dùng để đăng nhập |
-| `phone_number` | VARCHAR(20) | ✗ | |
+| `phone_number` | VARCHAR(20) | ✗ | **UNIQUE** — đề bài §3.2 |
 | `password` | VARCHAR(255) | ✗ | Lưu **hash BCrypt**, không lưu thô. 255 ký tự vì hash dài |
 | `created_at` | TIMESTAMP | ✗ | |
 
@@ -807,14 +809,14 @@ Dự án này **đã mất source một lần rồi**, nên đây là việc là
 ### 15.4 Khởi động hạ tầng
 
 ```
-docker compose up -d postgres redis activemq
+docker compose up -d postgres-bank postgres-payment postgres-notification redis activemq
 ```
 
 Kiểm tra từng cái:
 
 | Dịch vụ | Cách kiểm tra | Dấu hiệu đúng |
 |---|---|---|
-| Postgres | `docker exec -it bank-service-postgres pg_isready` | `accepting connections` |
+| Postgres (×3) | `docker exec -it postgres-bank pg_isready` — lặp lại với `postgres-payment`, `postgres-notification` | `accepting connections` |
 | Redis | `docker exec -it bank-service-redis redis-cli ping` | `PONG` |
 | ActiveMQ | mở `http://localhost:8161` | vào được, login `admin/admin` |
 
@@ -827,9 +829,9 @@ Kiểm tra từng cái:
 | Module | Cần |
 |---|---|
 | **pom cha** | Chỉ `<parent>` Spring Boot + `<properties>` + `<modules>`. Không dependency |
-| **bank-service** | web · data-jpa · postgresql · validation · lombok · security · jjwt (3 gói) · data-redis · cache · test · security-test |
-| **payment-service** | web · **activemq** · lombok · test |
-| **notification-service** | web · **activemq** · lombok · test |
+| **bank-service** | web · data-jpa · postgresql · validation · lombok · security · jjwt (3 gói) · data-redis · cache · actuator · test · security-test |
+| **payment-service** | web · **activemq** · data-jpa · postgresql · actuator · lombok · test |
+| **notification-service** | web · **activemq** · data-jpa · postgresql · actuator · lombok · test |
 
 Hai điểm đáng chú ý:
 

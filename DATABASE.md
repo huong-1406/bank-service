@@ -1,7 +1,34 @@
 # Thiết kế Database
 
-> Dùng cho `bank-service`. Hai service còn lại không có database.
+> **Mỗi service một database riêng**, mỗi database một container Postgres riêng, chạy ở port riêng (§0).
 > PostgreSQL 16. Chi tiết kiến trúc xem `ARCHITECTURE2.md`.
+
+---
+
+## 0. Mỗi service một database
+
+| Service | Container Postgres | Database | Port trên máy | Port trong Docker | Entity / bảng | Thiết kế ở |
+|---|---|---|---|---|---|---|
+| `bank-service` | `postgres-bank` | `bank_db` | **5432** | 5432 | `account`, `balance`, `card`, `transaction` | §1 – §11 |
+| `payment-service` | `postgres-payment` | `payment_db` | **5433** | 5432 | `payment` | §12 |
+| `notification-service` | `postgres-notification` | `notification_db` | **5434** | 5432 | `notification` | §13 |
+
+- **Port trên máy** — dùng khi chạy service từ IntelliJ hoặc mở DBeaver: `localhost:5432/5433/5434`. Ba database phải khác port vì cùng nằm trên một máy.
+- **Port trong Docker** — cả ba đều là 5432, vì mỗi container là một máy riêng, gọi nhau bằng tên container (`postgres-bank:5432`). Biến `DB_HOST`, `DB_PORT` trong `docker-compose.yml` lo phần này.
+
+### Luật: entity của service nào nằm ở database của service đó
+
+```
+bank-service          ──►  bank_db          account · balance · card · transaction
+payment-service       ──►  payment_db       payment
+notification-service  ──►  notification_db  notification
+```
+
+1. **Mỗi service chỉ kết nối database của chính nó.** `payment-service` không đọc `bank_db`, `bank-service` không đọc `payment_db`. Cần dữ liệu của service khác thì hỏi qua HTTP hoặc nhận qua message ActiveMQ.
+2. **Không có khoá ngoại giữa hai database.** PostgreSQL không cho FK trỏ sang database khác. Khi `payment` cần nhắc tới giao dịch bên `bank_db`, nó chỉ lưu **con số id** (`transaction_id BIGINT`), không có `REFERENCES`.
+3. **Entity không dùng chung giữa các module.** `payment-service` có class `Payment` của riêng nó, không import `Transaction` của `bank-service`.
+
+Nhờ vậy database của một service chết thì chỉ service đó lỗi — hai service còn lại vẫn chạy (đã thử bằng `docker kill postgres-payment`).
 
 ---
 
@@ -14,7 +41,7 @@
 | 3 | Chốt ràng buộc + vòng đời trạng thái (§5, §6) |
 | 4 | Viết 4 entity + 4 repository |
 | 5 | Viết `schema-extra.sql` — index + CHECK |
-| 6 | Seed dữ liệu mẫu, chạy thử |
+| 6 | Viết `data.sql` — seed dữ liệu mẫu, chạy thử |
 
 Ba bước đầu là **chốt trên giấy**, chưa gõ code. Làm ngược thứ tự — gõ entity trước rồi mới nghĩ ràng buộc — thì mỗi lần đổi ý phải sửa entity, sửa `schema-extra.sql`, rồi xoá database làm lại.
 
@@ -84,11 +111,13 @@ Lưu chuỗi thì nhìn thẳng vào database cũng đọc hiểu, và thêm gi�
 | `id` | BIGSERIAL | ✗ | PK | |
 | `customer_name` | VARCHAR(100) | ✗ | | |
 | `email` | VARCHAR(150) | ✗ | **UNIQUE** | Dùng để đăng nhập |
-| `phone_number` | VARCHAR(20) | ✗ | | Đủ chỗ cho mã quốc gia |
+| `phone_number` | VARCHAR(20) | ✗ | **UNIQUE** | Đủ chỗ cho mã quốc gia |
 | `password` | VARCHAR(255) | ✗ | | **Hash BCrypt**, không lưu thô |
 | `created_at` | TIMESTAMP | ✗ | | |
 
 `password` để 255 ký tự vì chuỗi hash BCrypt dài 60 ký tự, chừa dư phòng khi đổi thuật toán.
+
+**`email` và `phone_number` đều UNIQUE** — đề bài §3.2 yêu cầu *"email và số điện thoại không trùng"*. Service vẫn kiểm tra trước khi lưu để trả lỗi 400 dễ hiểu (*"Số điện thoại đã được sử dụng"*); UNIQUE ở database là lớp chặn cuối, phòng hai người đăng ký cùng số vào cùng một lúc.
 
 ### 4.2 `balance`
 
@@ -192,6 +221,7 @@ Những điều **luôn đúng** trong mọi thời điểm:
 | 3 | `amount` > 0 | CHECK |
 | 4 | Mỗi tài khoản có **đúng một** dòng số dư | PK trùng FK |
 | 5 | Email không trùng | UNIQUE |
+| 5b | Số điện thoại không trùng | UNIQUE |
 | 6 | Giao dịch **rút tiền và thanh toán** phải có thẻ | CHECK: `type = 'DEPOSIT' OR card_id IS NOT NULL` |
 | 7 | Không xoá được tài khoản còn thẻ **hoặc số dư ≠ 0** | FK RESTRICT trên `card.account_id` + kiểm tra ở Service |
 | 8 | Không xoá được thẻ còn giao dịch **`PENDING`** | Chỉ kiểm tra ở Service |
@@ -309,6 +339,7 @@ Bên JPA chỉ cần đánh dấu cột này là cột phiên bản, Hibernate t
 | # | Truy vấn | Dùng ở | Index |
 |---|---|---|---|
 | 1 | Tìm tài khoản theo email | Đăng nhập | Tự có từ UNIQUE |
+| 1b | Số điện thoại đã tồn tại chưa? | Đăng ký | Tự có từ UNIQUE |
 | 2 | Liệt kê thẻ của tài khoản | `GET /accounts/me/cards` | `idx_card_account` |
 | 3 | Tài khoản còn thẻ không? | Xoá tài khoản | `idx_card_account` |
 | 4 | Thẻ còn giao dịch `PENDING` không? | Xoá thẻ | `idx_txn_card_status` |
@@ -323,7 +354,7 @@ Bên JPA chỉ cần đánh dấu cột này là cột phiên bản, Hibernate t
 | `idx_txn_card_status` | `transaction(card_id, status)` |
 | `idx_txn_account` | `transaction(account_id)` |
 
-> **Không cần index cho `email`.** PostgreSQL tự tạo index khi khai `UNIQUE` — thêm nữa là thừa, chỉ tốn chỗ và làm chậm ghi.
+> **Không cần index cho `email` và `phone_number`.** PostgreSQL tự tạo index khi khai `UNIQUE` — thêm nữa là thừa, chỉ tốn chỗ và làm chậm ghi.
 
 `idx_txn_card_status` là index ghép 2 cột và quan trọng nhất. Không có nó thì mỗi lần xoá thẻ phải quét toàn bộ bảng giao dịch.
 
@@ -356,17 +387,17 @@ spring:
       mode: always
 ```
 
-**Bẫy 2 — chạy lần thứ hai thì sập.** PostgreSQL có `CREATE INDEX IF NOT EXISTS`, nhưng **không có** `ADD CONSTRAINT IF NOT EXISTS`. Khởi động lần 2 sẽ báo constraint đã tồn tại. Nên index viết thẳng, còn CHECK phải bọc điều kiện:
+**Bẫy 2 — chạy lần thứ hai thì sập.** PostgreSQL có `CREATE INDEX IF NOT EXISTS`, nhưng **không có** `ADD CONSTRAINT IF NOT EXISTS`. Khởi động lần 2 sẽ báo constraint đã tồn tại. Nên index viết thẳng, còn CHECK thì xoá trước rồi thêm lại:
 
 ```sql
 CREATE INDEX IF NOT EXISTS idx_card_account ON card(account_id);
 
-DO $$ BEGIN
-    ALTER TABLE balance ADD CONSTRAINT chk_available_non_negative
-        CHECK (available_balance >= 0);
-EXCEPTION WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE balance DROP CONSTRAINT IF EXISTS chk_balance_available_non_negative;
+ALTER TABLE balance ADD CONSTRAINT chk_balance_available_non_negative
+    CHECK (available_balance >= 0);
 ```
+
+> **Không dùng khối `DO $$ ... EXCEPTION ... END $$`.** Spring tách file SQL theo dấu `;`, cắt khối `DO` làm nhiều mảnh → app sập lúc khởi động. `DROP IF EXISTS` + `ADD` cho kết quả giống hệt mà không cần khối lệnh.
 
 Viết kiểu này thì chạy lại bao nhiêu lần cũng được — cần thiết vì app khởi động lại rất nhiều lần trong lúc phát triển.
 
@@ -378,12 +409,14 @@ Khi entity thay đổi nhiều, cách nhanh nhất là **xoá sạch database l�
 
 Cần seed sẵn để Postman chạy được ngay và không phải đăng ký tay mỗi lần dựng lại DB.
 
-| Tài khoản | Email | Số dư khả dụng | Thẻ |
-|---|---|---|---|
-| Nguyễn Văn A | `a@test.com` | 1.000.000 | 1 thẻ `ACTIVE`, hạn **2030-12-31** |
-| Trần Thị B | `b@test.com` | 0 | không có thẻ |
-| Lê Văn C | `c@test.com` | 500.000 | 1 thẻ `INACTIVE`, hạn 2030-12-31 |
-| Phạm Thị D | `d@test.com` | 500.000 | 1 thẻ `ACTIVE`, hạn **2020-01-31** (đã hết hạn) |
+| Tài khoản | Email | Số điện thoại | Số dư khả dụng | Thẻ |
+|---|---|---|---|---|
+| Nguyễn Văn A | `a@test.com` | `0900000001` | 1.000.000 | 1 thẻ `ACTIVE`, hạn **2030-12-31** |
+| Trần Thị B | `b@test.com` | `0900000002` | 0 | không có thẻ |
+| Lê Văn C | `c@test.com` | `0900000003` | 500.000 | 1 thẻ `INACTIVE`, hạn 2030-12-31 |
+| Phạm Thị D | `d@test.com` | `0900000004` | 500.000 | 1 thẻ `ACTIVE`, hạn **2020-01-31** (đã hết hạn) |
+
+Số điện thoại phải khác nhau cho cả bốn — trùng là vi phạm UNIQUE (§4.1) và seed sập ngay.
 
 Bốn tài khoản này phục vụ đúng các case cần test:
 
@@ -400,22 +433,95 @@ Cả bốn tài khoản dùng chung mật khẩu gốc **`Test@1234`** — đủ
 
 Trong database phải lưu dạng **hash BCrypt**, không lưu thô. Sinh hash một lần rồi dán vào file seed, không hard-code mật khẩu thô ở bất cứ đâu trong source.
 
+### Seed phải chạy lại được
+
+`data.sql` chạy **mỗi lần** app khởi động (`sql.init.mode: always`, §9). Viết `INSERT` thường thì lần khởi động thứ hai sẽ chèn trùng email → vi phạm UNIQUE → app sập. Cùng loại bẫy với §9 bẫy 2.
+
+Cách viết:
+
+- `account` — `INSERT ... ON CONFLICT (email) DO NOTHING`
+- `balance`, `card` — không ghi `id` cứng, lấy `account_id` bằng truy vấn theo email, và chỉ chèn khi chưa có:
+
+```sql
+INSERT INTO balance (account_id, available_balance, hold_balance, version)
+SELECT id, 1000000, 0, 0 FROM account WHERE email = 'a@test.com'
+ON CONFLICT (account_id) DO NOTHING;
+```
+
+**Không ghi `id` cứng** như `VALUES (1, ...)`. Chèn tay giá trị cho cột `BIGSERIAL` thì bộ đếm tự tăng không biết, lần đăng ký thật đầu tiên sẽ nhận lại `id = 1` → trùng khóa chính.
+
 ---
 
-## 11. Checklist
+## 11. Checklist — `bank_db`
 
-- [ ] Không cột tiền nào dùng `FLOAT`/`DOUBLE`
-- [ ] Java dùng `BigDecimal`, không dùng `double`
-- [ ] Enum lưu chuỗi, không lưu số
-- [ ] `balance.account_id` vừa PK vừa FK
-- [ ] `balance` có cột `version`
-- [ ] `card.account_id` dùng ON DELETE **RESTRICT**
-- [ ] `transaction.account_id` và `transaction.card_id` dùng ON DELETE **CASCADE**
-- [ ] `transaction.card_id` cho phép NULL
+- [x] Không cột tiền nào dùng `FLOAT`/`DOUBLE`
+- [x] Java dùng `BigDecimal`, không dùng `double`
+- [x] Enum lưu chuỗi, không lưu số
+- [x] `account.email` **và** `account.phone_number` đều UNIQUE
+- [x] `balance.account_id` vừa PK vừa FK
+- [x] `balance` có cột `version`
+- [x] `card.account_id` dùng ON DELETE **RESTRICT**
+- [x] `transaction.account_id` và `transaction.card_id` dùng ON DELETE **CASCADE**
+- [x] `transaction.card_id` cho phép NULL
 - [ ] Xoá thẻ chỉ chặn khi còn giao dịch **`PENDING`**, không chặn khi chỉ còn `COMPLETED`
 - [ ] Rút tiền / thanh toán kiểm tra **cả `status = ACTIVE` lẫn `expiry_date >= hôm nay`**
 - [ ] Xoá tài khoản kiểm tra `available_balance` **và** `hold_balance` đều bằng 0
-- [ ] Có `schema-extra.sql` với 3 index và các CHECK
-- [ ] `defer-datasource-initialization: true` đã bật, app chạy lại lần 2 không sập
-- [ ] Mật khẩu lưu hash BCrypt
-- [ ] Có dữ liệu mẫu **4** tài khoản, trong đó có 1 thẻ đã hết hạn
+- [x] Có `schema-extra.sql` với 3 index và các CHECK
+- [x] `defer-datasource-initialization: true` đã bật, app chạy lại lần 2 không sập
+- [x] Mật khẩu lưu hash BCrypt
+- [x] Có dữ liệu mẫu **4** tài khoản, trong đó có 1 thẻ đã hết hạn, SĐT không trùng
+- [x] `data.sql` chạy lại lần 2 không sập (`ON CONFLICT`, không ghi `id` cứng)
+
+---
+
+## 12. `payment_db` — database của `payment-service`
+
+> **Đề bài không liệt kê bảng này** — phần 3 của đề chỉ có 4 bảng ở `bank_db`. Bảng này có vì đã chốt *mỗi service một database*. Giữ tối giản.
+
+### `payment`
+
+Mỗi dòng là một yêu cầu thanh toán `payment-service` nhận từ `bank-service` qua HTTP.
+
+| Cột | Kiểu | Null | Ràng buộc | Ghi chú |
+|---|---|---|---|---|
+| `id` | BIGSERIAL | ✗ | PK | |
+| `transaction_id` | BIGINT | ✗ | **UNIQUE** | id của `transaction` bên `bank_db` — chính là `paymentId` trong message. **Không phải FK** (§0 luật 2) |
+| `account_id` | BIGINT | ✗ | | id tài khoản bên `bank_db`, chỉ để tra cứu. Không phải FK |
+| `amount` | DECIMAL(19,2) | ✗ | CHECK > 0 | |
+| `currency` | VARCHAR(3) | ✗ | | |
+| `status` | VARCHAR(20) | ✗ | | `RECEIVED` → `SENT` (đã đẩy vào queue) |
+| `created_at` | TIMESTAMP | ✗ | | |
+
+**`transaction_id` UNIQUE** — `bank-service` gọi lại lần hai cho cùng một giao dịch (ví dụ timeout rồi gọi lại) thì không tạo thêm dòng, không đẩy message lần hai.
+
+---
+
+## 13. `notification_db` — database của `notification-service`
+
+> Tương tự §12: đề bài không liệt kê, có vì *mỗi service một database*.
+
+### `notification`
+
+Mỗi dòng là một message đã nhận từ ActiveMQ và đã log ra console.
+
+| Cột | Kiểu | Null | Ràng buộc | Ghi chú |
+|---|---|---|---|---|
+| `id` | BIGSERIAL | ✗ | PK | |
+| `payment_id` | BIGINT | ✗ | **UNIQUE** | `paymentId` trong message. Không phải FK |
+| `account_id` | BIGINT | ✗ | | Không phải FK |
+| `amount` | DECIMAL(19,2) | ✗ | CHECK > 0 | |
+| `currency` | VARCHAR(3) | ✗ | | |
+| `message` | VARCHAR(255) | ✗ | | Nội dung đã log, ví dụ `Payment confirmed for paymentId: 12345` |
+| `created_at` | TIMESTAMP | ✗ | | |
+
+**`payment_id` UNIQUE là chỗ chống xử lý trùng message** — rủi ro đã ghi ở `ARCHITECTURE2.md` §7.1. ActiveMQ có thể giao lại cùng một message (consumer chết giữa chừng). Lần thứ hai lưu sẽ vi phạm UNIQUE → listener biết là đã xử lý rồi, bỏ qua, không log hai lần.
+
+---
+
+## 14. Checklist — tách database
+
+- [ ] Mỗi service chỉ có datasource trỏ vào database của chính nó
+- [ ] Port trên máy khác nhau: 5432 / 5433 / 5434
+- [ ] Không có FK nào trỏ sang database khác — chỉ lưu id dạng số
+- [ ] Không module nào import entity của module khác
+- [ ] `payment.transaction_id` và `notification.payment_id` đều UNIQUE
