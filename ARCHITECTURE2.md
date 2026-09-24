@@ -2,33 +2,36 @@
 
 > Tài liệu kiến trúc **duy nhất** của dự án, viết theo đề bài gốc.
 > Hệ thống: **3 service Spring Boot** (`bank-service`, `payment-service`, `notification-service`) + **frontend React** riêng.
-> Kèm theo: `DATABASE.md` (thiết kế CSDL) · `API.md` (đặc tả API) · `PLAN.md` (lịch làm việc).
+> Kèm theo: `DATABASE.md` (thiết kế CSDL) · `API.md` (đặc tả API).
 > Cập nhật: 2026-09-24.
 
 ---
 
-## 0. Giả định & phạm vi
+## 1. Giả định & phạm vi
 
-### 0.1 Hai giả định đang chờ chốt
+### 1.1 Ba giả định — đã chốt
 
-| # | Giả định đang dùng trong tài liệu này | Nếu đổi thì sao |
+| # | Quyết định | Căn cứ |
 |---|---|---|
-| **A1** | **3 service riêng** (`bank-service`, `payment-service`, `notification-service`), Maven multi-module | Nếu chọn monolith → xem §12 |
-| **A2** | **Frontend = React (SPA riêng)**, project độc lập, deploy bằng nginx | Nếu chọn Thymeleaf nhúng trong `bank-service` → xem §12 |
+| **A1** | **3 service riêng** (`bank-service`, `payment-service`, `notification-service`), Maven multi-module | Đề bài yêu cầu thẳng: *"tạo thêm 2 service riêng biệt"*. Không còn là lựa chọn. Phương án monolith giữ ở §13.1 để tham khảo |
+| **A2** | **Frontend = React (SPA riêng)**, project độc lập, deploy bằng nginx | Đề bài cho *"tùy ý, ví dụ jsp - thymleaf"* → tự chọn. Chốt React. Phương án Thymeleaf giữ ở §13.2 nếu cần đổi |
+| **A3** | **Phạm vi = đúng đề bài.** Figma chỉ tham khảo giao diện, không mở rộng chức năng | Figma vẽ nhiều hơn đề bài khoảng 2-3 lần (lịch sử giao dịch, chuyển khoản, OTP, admin duyệt, VIP). Barem chấm bám đề bài nên bỏ hết phần dư |
 
-### 0.2 Điều chưa kiểm chứng
+Ngoài ra, các quyết định khác đã chốt trong lúc rà đề bài:
 
-Link Figma của đề bài: <https://www.figma.com/design/bTDzXJpTuMwuqv2S4vKPRy/Banking--Copy-?node-id=0-1&p=f>
+| Việc | Chốt | Ghi chú |
+|---|---|---|
+| Kho code | **GitHub** | **Lệch đề bài có chủ ý** — xem §12 |
+| Khoá ngoại `transaction` | **ON DELETE CASCADE** | Xem §5.7 và `DATABASE.md` §4.4 |
+| "Thẻ hợp lệ" | `ACTIVE` **và** chưa hết hạn | Xem §1.2 và `DATABASE.md` §4.3 |
 
-**Tôi chưa mở link này.** Danh sách màn hình ở §8 là **suy ra từ tập API**, không phải đọc từ Figma. Phải đối chiếu lại với Figma thật trước khi bắt tay làm frontend — số màn và luồng có thể khác.
-
-### 0.3 Ba ràng buộc nghiệp vụ (đề bài nhắc lại 3 lần)
+### 1.2 Ba ràng buộc nghiệp vụ (đề bài nhắc lại 3 lần)
 
 1. **Chỉ thẻ hợp lệ mới được phép hoạt động** → card phải `ACTIVE` và chưa hết hạn.
 2. **Không được tạo thẻ cho tài khoản không tồn tại.**
 3. **Không được trừ tiền nếu số dư khả dụng không đủ.**
 
-### 0.4 Ba quy tắc phân tầng (đề bài yêu cầu)
+### 1.3 Ba quy tắc phân tầng (đề bài yêu cầu)
 
 - Phần xử lý **in/out** → Controller layer
 - Phần **logic** → Service layer
@@ -36,7 +39,7 @@ Link Figma của đề bài: <https://www.figma.com/design/bTDzXJpTuMwuqv2S4vKPR
 
 ---
 
-## 1. Tổng quan hệ thống
+## 2. Tổng quan hệ thống
 
 ```
                         ┌──────────────────────────┐
@@ -82,9 +85,9 @@ Link Figma của đề bài: <https://www.figma.com/design/bTDzXJpTuMwuqv2S4vKPR
 
 ---
 
-## 2. Kiến trúc layer (MVC) của bank-service
+## 3. Kiến trúc layer (MVC) của bank-service
 
-Giữ nguyên từ v1 — đây là phần đề bài chấm kỹ nhất (§0.4).
+Giữ nguyên từ v1 — đây là phần đề bài chấm kỹ nhất (§1.3).
 
 ```
 ┌───────────────────────────────────────────────────┐
@@ -127,7 +130,7 @@ Giữ nguyên từ v1 — đây là phần đề bài chấm kỹ nhất (§0.4)
 
 ---
 
-## 3. Cấu trúc thư mục (Maven multi-module)
+## 4. Cấu trúc thư mục (Maven multi-module)
 
 ```
 bank-system/                          ← pom cha, packaging=pom
@@ -198,14 +201,14 @@ bank-system/                          ← pom cha, packaging=pom
         │   └── paymentApi.js
         ├── context/AuthContext.jsx   giữ token + thông tin đăng nhập
         ├── routes/PrivateRoute.jsx   chặn vào trang khi chưa login
-        ├── pages/                    10 màn ở §8.1
+        ├── pages/                    10 màn ở §9.2
         ├── components/               Layout · Header · Sidebar · Toast · Modal
         └── styles/
 ```
 
 ---
 
-## 4. Sơ đồ thực thể (ERD)
+## 5. Sơ đồ thực thể (ERD)
 
 ```
                     ┌───────────────────────┐
@@ -234,7 +237,7 @@ bank-system/                          ← pom cha, packaging=pom
                                           └─────────────────────┘
 ```
 
-### 4.1 Ghi chú về `Transaction`
+### 5.1 Ghi chú về `Transaction`
 
 Đề bài **không liệt kê** `Transaction` trong danh sách thực thể, nhưng lại yêu cầu:
 
@@ -242,7 +245,7 @@ bank-system/                          ← pom cha, packaging=pom
 
 → Không có bảng `transaction` với trạng thái `PENDING` thì **không thể làm được yêu cầu này**. Vì vậy `Transaction` là thực thể **bắt buộc phải suy ra**, dù đề bài không nói thẳng.
 
-### 4.2 Ghi chú về `holdBalance`
+### 5.2 Ghi chú về `holdBalance`
 
 Đề bài định nghĩa: *"Số dư đang bị giữ (ví dụ: chờ xử lý giao dịch)"* — tức chính là tiền của các `Transaction` đang `PENDING`.
 
@@ -256,7 +259,7 @@ bank-system/                          ← pom cha, packaging=pom
 
 Nhờ vậy `holdBalance` có ý nghĩa thật và chặn được double-spend.
 
-### 4.3 Quy ước chung
+### 5.3 Quy ước chung
 
 | Việc | Quy ước |
 |---|---|
@@ -273,7 +276,7 @@ Nhờ vậy `holdBalance` có ý nghĩa thật và chặn được double-spend.
 
 **Enum phải lưu chuỗi.** Nếu lưu số theo thứ tự khai báo, sau này chỉ cần chèn thêm một giá trị vào giữa danh sách là **toàn bộ dữ liệu cũ hiểu sai** — thẻ `ACTIVE` bỗng thành `INACTIVE`. Lưu chuỗi thì đọc DB cũng hiểu ngay.
 
-### 4.4 Bảng `account`
+### 5.4 Bảng `account`
 
 | Cột | Kiểu | Null | Ràng buộc |
 |---|---|---|---|
@@ -284,20 +287,20 @@ Nhờ vậy `holdBalance` có ý nghĩa thật và chặn được double-spend.
 | `password` | VARCHAR(255) | ✗ | Lưu **hash BCrypt**, không lưu thô. 255 ký tự vì hash dài |
 | `created_at` | TIMESTAMP | ✗ | |
 
-### 4.5 Bảng `balance`
+### 5.5 Bảng `balance`
 
 | Cột | Kiểu | Null | Ràng buộc |
 |---|---|---|---|
 | `account_id` | BIGINT | ✗ | **PK và FK cùng lúc** → ép quan hệ 1–1 |
 | `available_balance` | DECIMAL(19,2) | ✗ | mặc định 0, **CHECK ≥ 0** |
 | `hold_balance` | DECIMAL(19,2) | ✗ | mặc định 0, **CHECK ≥ 0** |
-| `version` | BIGINT | ✗ | chống tranh chấp — xem §4.8 |
+| `version` | BIGINT | ✗ | chống tranh chấp — xem §5.8 |
 
 `account_id` vừa là khóa chính vừa là khóa ngoại. Cách này đảm bảo **một tài khoản chỉ có đúng một dòng số dư** ở mức database, không cần code kiểm tra.
 
 FK `ON DELETE CASCADE` — xoá tài khoản thì dòng số dư đi theo.
 
-### 4.6 Bảng `card`
+### 5.6 Bảng `card`
 
 | Cột | Kiểu | Null | Ràng buộc |
 |---|---|---|---|
@@ -310,13 +313,13 @@ FK `ON DELETE CASCADE` — xoá tài khoản thì dòng số dư đi theo.
 
 `ON DELETE RESTRICT` chứ không phải CASCADE — vì đề bài yêu cầu **chặn xoá tài khoản khi còn thẻ**. Để database chặn luôn là lớp bảo vệ thứ hai, phòng khi code sót.
 
-### 4.7 Bảng `transaction`
+### 5.7 Bảng `transaction`
 
 | Cột | Kiểu | Null | Ràng buộc |
 |---|---|---|---|
 | `id` | BIGSERIAL | ✗ | PK |
-| `account_id` | BIGINT | ✗ | FK → `account(id)` |
-| `card_id` | BIGINT | **✓** | FK → `card(id)`, **ON DELETE RESTRICT** |
+| `account_id` | BIGINT | ✗ | FK → `account(id)`, **ON DELETE CASCADE** |
+| `card_id` | BIGINT | **✓** | FK → `card(id)`, **ON DELETE CASCADE** |
 | `amount` | DECIMAL(19,2) | ✗ | **CHECK > 0** |
 | `currency` | VARCHAR(3) | ✗ | `VND`, `USD`… |
 | `type` | VARCHAR(20) | ✗ | `DEPOSIT` / `WITHDRAW` / `PAYMENT` |
@@ -326,7 +329,9 @@ FK `ON DELETE CASCADE` — xoá tài khoản thì dòng số dư đi theo.
 
 `card_id` **được phép NULL** — nạp tiền thì không liên quan tới thẻ nào.
 
-### 4.8 Index cần tạo
+Cả hai khoá ngoại dùng **CASCADE**, không phải `RESTRICT`. `RESTRICT` chặn xoá khi còn *bất kỳ* giao dịch nào, trong khi đề bài chỉ chặn khi còn giao dịch **`PENDING`** — dùng `RESTRICT` thì một thẻ chỉ còn giao dịch `COMPLETED` sẽ trả 500 thay vì xoá được. Luật nghiệp vụ chuyển hết về tầng Service. Lập luận đầy đủ ở `DATABASE.md` §4.4.
+
+### 5.8 Index cần tạo
 
 `ddl-auto: update` tự tạo bảng nhưng **không tự tạo index** cho các truy vấn của mình. Ba index sau phải thêm tay:
 
@@ -342,7 +347,7 @@ FK `ON DELETE CASCADE` — xoá tài khoản thì dòng số dư đi theo.
 
 Chi tiết đầy đủ xem `DATABASE.md`.
 
-### 4.9 Chống tranh chấp khi trừ tiền
+### 5.9 Chống tranh chấp khi trừ tiền
 
 Tình huống: hai yêu cầu rút tiền vào **cùng lúc**. Cả hai cùng đọc số dư 1 triệu, cả hai đều thấy đủ, cả hai đều cho qua. Kết quả rút được 2 triệu từ tài khoản 1 triệu.
 
@@ -352,14 +357,14 @@ Tình huống: hai yêu cầu rút tiền vào **cùng lúc**. Cả hai cùng đ
 
 Thêm một cột và một annotation, gần như không tốn thời gian. Nhưng nếu bỏ qua thì đây là lỗ hổng nghiêm trọng nhất của cả hệ thống.
 
-### 4.10 Về `ddl-auto: update`
+### 5.10 Về `ddl-auto: update`
 
-`application.yml` đang để `update` — Hibernate tự sinh bảng từ entity. Với 1 tuần thì dùng được, nhưng cần biết giới hạn:
+`application.yml` đang để `update` — Hibernate tự sinh bảng từ entity. Dùng được cho dự án này, nhưng cần biết giới hạn:
 
 | `ddl-auto: update` làm được | Không làm được |
 |---|---|
-| Tạo bảng, cột, khóa ngoại | Tạo index tự định nghĩa (§4.8) |
-| Thêm cột mới | Tạo `CHECK` constraint (§4.5, §4.7) |
+| Tạo bảng, cột, khóa ngoại | Tạo index tự định nghĩa (§5.8) |
+| Thêm cột mới | Tạo `CHECK` constraint (§5.5, §5.7) |
 | | Xoá cột đã bỏ khỏi entity |
 
 Nên viết một file `schema-extra.sql` chứa phần index và CHECK, chạy bổ sung sau khi Hibernate tạo xong bảng.
@@ -368,7 +373,7 @@ Khi entity thay đổi nhiều, cách nhanh nhất là **xoá sạch database l�
 
 ---
 
-## 5. Luồng JWT (Tuần 1+2, ngày 4-5)
+## 6. Luồng JWT
 
 Yêu cầu đề bài: *"Thay vì phải gửi thông tin account_id lên qua body hoặc param, hãy lấy nó từ JWT"*.
 
@@ -390,9 +395,9 @@ Client              AuthController          JwtFilter            Controller
   │       response — accountId đọc từ token, KHÔNG từ body/param     │
 ```
 
-### 5.1 Đổi URL sau khi tích hợp JWT
+### 6.1 Vì sao URL là `/accounts/me`
 
-| Trước (ngày 1-3) | Sau (ngày 4-5) |
+| Nếu không có JWT | Khi lấy accountId từ JWT (cách dự án làm) |
 |---|---|
 | `GET /accounts/{id}` | `GET /accounts/me` |
 | `PUT /accounts/{id}` | `PUT /accounts/me` |
@@ -401,15 +406,15 @@ Client              AuthController          JwtFilter            Controller
 | `POST /accounts/{id}/cards` | `POST /accounts/me/cards` |
 | `GET /accounts/{id}/balance` | `GET /accounts/me/balance` |
 
-> ⚠️ Bước này sửa lại **toàn bộ endpoint đã viết ở ngày 1-3**. Commit riêng, và viết Postman collection **sau** bước này chứ đừng viết trước.
+> Vì JWT làm ngay từ đầu (§10 mục 2), dự án viết thẳng dạng `/accounts/me` — **không phải sửa lại endpoint nào**. Bảng trên chỉ để hiểu vì sao không dùng `{id}`.
 
-### 5.2 Endpoint không cần token
+### 6.2 Endpoint không cần token
 
 `POST /auth/login` và `POST /accounts` (đăng ký) phải `permitAll`, nếu không sẽ không ai tạo được tài khoản đầu tiên.
 
 ---
 
-## 6. Luồng thanh toán qua ActiveMQ (Tuần 3, ngày 2-3)
+## 7. Luồng thanh toán qua ActiveMQ
 
 Theo đúng mô tả đề bài: `bank-service` gọi HTTP sang `payment-service`, service này đẩy message vào queue, `notification-service` consume và log.
 
@@ -443,23 +448,32 @@ Client      bank-service        payment-service      ActiveMQ      notification-
 
 > `currency` là trường dễ bị bỏ sót — đề bài có, nhưng không nằm trong danh sách thực thể.
 
-### 6.1 Ba điểm dễ sai
+### 7.1 Ba điểm dễ sai
 
 - **Commit DB trước khi gọi HTTP.** Nếu gọi `payment-service` trước khi commit `Transaction`, consumer có thể xử lý xong trước khi row tồn tại.
 - **Listener phải idempotent.** ActiveMQ có thể redeliver message; không check thì log/trừ tiền 2 lần.
 - **`bank-service` phải chịu được `payment-service` chết.** Gọi HTTP có timeout, lỗi thì đánh `Transaction` = `FAILED` và hoàn `holdBalance`.
 
-### 6.2 Mở rộng ngoài đề bài (tùy chọn)
+### 7.2 Ai đánh `COMPLETED`? — đã chốt
 
-Đề bài chỉ yêu cầu `notification-service` **log ra console**, không yêu cầu chốt lại `Transaction`. Nếu muốn trạng thái `COMPLETED` có ý nghĩa thật:
+**`bank-service` tự đánh, ngay khi `payment-service` trả `202`.** Không làm queue thứ hai.
 
-> `notification-service` bắn message sang queue thứ hai `payment.completed.queue` → `bank-service` consume → `UPDATE Transaction status=COMPLETED` + `holdBalance −= amount`.
+Đề bài chỉ yêu cầu `notification-service` **log ra console**, không nói ai chốt lại `Transaction`. Nhưng nếu không ai chốt thì mọi giao dịch nằm `PENDING` vĩnh viễn và `holdBalance` không bao giờ nhả — tiền rời `availableBalance` rồi kẹt luôn.
 
-Làm vậy giữ được nguyên tắc **mỗi service chỉ đụng DB của mình**, không share database. Nhưng đây là phần cộng thêm — làm sau khi luồng chính đã chạy.
+> Thử theo kịch bản chấm: nạp 1.000.000 → thanh toán 800.000 → xem số dư thấy **khả dụng 200.000, giữ 800.000, mãi mãi**. Người chấm sẽ coi là lỗi mất tiền.
+
+Nên ngay sau khi `payment-service` trả `202`, `bank-service` làm tiếp:
+
+- `UPDATE transaction SET status = 'COMPLETED'`
+- `UPDATE balance SET hold_balance = hold_balance − amount`
+
+rồi mới trả `202` về cho client. Gọi HTTP lỗi hoặc timeout thì ngược lại: `status = 'FAILED'` + hoàn `amount` từ `holdBalance` về `availableBalance`.
+
+> **Đánh đổi đã biết:** `202` của `payment-service` nghĩa là *"đã nhận vào queue"*, chưa phải *"đã gửi thông báo xong"* — nên đánh `COMPLETED` ở đây là hơi sớm về ngữ nghĩa. Cách chặt chẽ hơn là `notification-service` bắn message về queue thứ hai để `bank-service` chốt, nhưng đó là phần **ngoài đề bài — không làm**.
 
 ---
 
-## 7. Cache-aside Redis (Tuần 3, ngày 1)
+## 8. Cache-aside Redis
 
 Chỉ áp dụng trong `bank-service`.
 
@@ -480,7 +494,7 @@ Chỉ áp dụng trong `bank-service`.
 
 | Đối tượng cache | Annotation | Evict khi nào |
 |---|---|---|
-| Chi tiết account | `@Cacheable("account")` | `@CacheEvict` khi update (ngày 1-2) / delete account |
+| Chi tiết account | `@Cacheable("account")` | `@CacheEvict` khi update / delete account |
 | Số dư | `@Cacheable("balance")` | `@CachePut` ngay sau deposit/withdraw |
 
 TTL: **10 phút** (`spring.cache.redis.time-to-live: 600000`).
@@ -489,26 +503,26 @@ TTL: **10 phút** (`spring.cache.redis.time-to-live: 600000`).
 
 ---
 
-## 8. Frontend (song song, 2 tuần)
+## 9. Frontend (chạy song song với backend)
 
 > **Giả định A2: React (SPA riêng)** — project Node độc lập ở thư mục `frontend/`, build bằng Vite, chạy sau nginx ở cổng 3000. Không nằm trong Maven multi-module.
 
-### 8.0 Stack đề xuất
+### 9.1 Stack đề xuất
 
 | Việc | Thư viện | Vì sao |
 |---|---|---|
 | Build tool | **Vite** | Nhanh, cấu hình gần như bằng 0 |
-| Điều hướng | **React Router** | 10 màn ở §8.1 cần route riêng |
+| Điều hướng | **React Router** | 10 màn ở §9.2 cần route riêng |
 | Gọi API | **Axios** | Có interceptor — gắn token và bắt lỗi 401 ở **một chỗ duy nhất** |
 | Trạng thái đăng nhập | **Context API** | Chỉ cần giữ token + user, chưa cần Redux |
-| Giao diện | **MUI** hoặc **Tailwind** | Chọn theo Figma; MUI nhanh hơn nếu Figma theo Material |
+| Giao diện | **React-Bootstrap** | Đã quen Bootstrap → dựng nhanh nhất. 7/10 màn là form, Bootstrap làm tốt. Dùng bản `react-bootstrap`, không dùng Bootstrap gốc (JS của nó đá nhau với React) |
 | Form | **React Hook Form** | Validate phía client trước khi gọi API |
 
 > Chưa cần Redux / React Query. Bài này chỉ có 10 màn và 1 luồng đăng nhập — thêm vào là thừa.
 
-### 8.1 Màn hình — SUY RA TỪ API, chưa đối chiếu Figma
+### 9.2 Màn hình — đã chốt theo đề bài
 
-⚠️ Danh sách dưới đây được suy ra từ tập API của đề bài. **Chưa mở link Figma** nên phải rà lại trước khi làm.
+Đã đối chiếu Figma. Đây là **danh sách cuối cùng**: 10 màn, mỗi màn ứng với một API có thật trong đề bài. Màn nào Figma có mà đề bài không có thì đã loại (§1.1 giả định A3).
 
 | # | Màn hình | API dùng |
 |---|---|---|
@@ -523,7 +537,7 @@ TTL: **10 phút** (`spring.cache.redis.time-to-live: 600000`).
 | 9 | Rút tiền | `POST /balance/withdraw` |
 | 10 | Thanh toán | `POST /payments` |
 
-### 8.2 Bốn vướng mắc kỹ thuật của SPA
+### 9.3 Bốn vướng mắc kỹ thuật của SPA
 
 #### (1) CORS — chắc chắn sẽ gặp
 
@@ -559,26 +573,26 @@ Dùng **axios interceptor** đặt ở `api/axiosClient.js`, làm 2 việc:
 
 Lưu ý: đây chỉ là **chặn ở giao diện cho đẹp**, không phải bảo mật. Bảo mật thật nằm ở backend — dù có vào được trang, không có token thì API vẫn trả 401.
 
-### 8.3 Lộ trình frontend (chạy song song 2 tuần)
+### 9.4 Thứ tự làm frontend
 
-| Giai đoạn | Việc |
+| # | Việc |
 |---|---|
-| Tuần 1 đầu | Mở Figma, chốt lại bảng §8.1. `npm create vite`, cài router + axios + thư viện UI |
-| Tuần 1 | Layout chung (Header/Sidebar), `AuthContext`, `axiosClient`, `PrivateRoute`, màn login + đăng ký |
-| Tuần 1 cuối | Dashboard + màn tài khoản — **dùng dữ liệu giả**, backend chưa xong vẫn làm được |
-| Tuần 2 đầu | Màn thẻ + màn số dư. Backend ngày 1-3 xong thì bắt đầu nối API thật |
-| Tuần 2 giữa | Màn thanh toán. Hiển thị lỗi trả về từ `GlobalExceptionHandler` |
-| Tuần 2 cuối | Viết `Dockerfile` + `nginx.conf`, rà lại toàn bộ 10 màn |
+| 1 | Mở Figma lấy màu / font / bố cục (§15.9) — §9.2 đã chốt. `npm create vite`, cài router + axios + thư viện UI |
+| 2 | Layout chung (Header/Sidebar), `AuthContext`, `axiosClient`, `PrivateRoute`, màn login + đăng ký |
+| 3 | Dashboard + màn tài khoản — **dùng dữ liệu giả**, backend chưa xong vẫn làm được |
+| 4 | Màn thẻ + màn số dư. Backend xong nhóm số dư (§10 mục 12-14) thì bắt đầu nối API thật |
+| 5 | Màn thanh toán. Hiển thị lỗi trả về từ `GlobalExceptionHandler` |
+| 6 | Viết `Dockerfile` + `nginx.conf`, rà lại toàn bộ 10 màn |
 
 > Frontend **không bị chặn** bởi backend: dựng UI với dữ liệu giả trước, nối API sau.
 
-### 8.4 Hai chỗ frontend phải khớp với backend
+### 9.5 Hai chỗ frontend phải khớp với backend
 
-**Đợi mục 14 rồi hãy nối API.** Mục 14 (§9) đổi hết URL từ `/accounts/{id}` sang `/accounts/me`. Nối API trước bước đó thì phải sửa lại toàn bộ `api/*.js`.
+**URL đã chốt là `/accounts/me`.** Vì JWT làm ngay mục 2 (§10), backend không còn bước đổi URL nào nữa — `api/*.js` viết một lần, không phải sửa lại.
 
 **Thống nhất định dạng lỗi.** `GlobalExceptionHandler` phải trả body lỗi cố định một kiểu, để React chỉ cần một component `Toast` đọc đúng một trường là hiện được mọi lỗi — thay vì mỗi API một kiểu.
 
-### 8.5 nginx và biến môi trường
+### 9.6 nginx và biến môi trường
 
 React build ra **file tĩnh**, không có server Node lúc chạy — nginx chỉ việc serve thư mục `dist/`.
 
@@ -589,41 +603,43 @@ Hai chỗ hay sập:
 
 ---
 
-## 9. Backlog theo đề bài
+## 10. Backlog theo đề bài
 
-### Tuần 1+2 · Ngày 1-2 — Khởi động + Quản lý tài khoản
+> **JWT làm trước, không làm sau.** Đề bài xếp JWT sau 10 API. Theo thứ tự đó thì phải viết API dạng `/accounts/{id}` rồi đập đi sửa hết sang `/accounts/me`. Làm JWT trước thì viết một lần là xong. Vẫn đúng đề bài — đề bài quy định *kết quả* (accountId lấy từ JWT), không quy định thứ tự làm. URL trong backlog dưới đây là dạng cuối cùng, khớp `API.md`.
+
+### Khởi động + Security
 
 | # | Việc | Ràng buộc |
 |---|---|---|
 | 1 | Khởi tạo project, 4 entity + 4 repository | |
-| 2 | `POST /accounts` — tạo tài khoản (tên, email, SĐT) | Tự tạo `Balance` = 0 cùng transaction |
-| 3 | `PUT /accounts/{id}` — cập nhật | **Chỉ** email hoặc SĐT |
-| 4 | `GET /accounts/{id}` — chi tiết | Trả kèm balance |
-| 5 | `DELETE /accounts/{id}` | **Chỉ xoá nếu không có thẻ liên kết VÀ số dư = 0** |
+| 2 | `JwtUtil`, `JwtAuthenticationFilter`, `SecurityConfig`, `SecurityUtil` | |
+| 3 | `POST /auth/login` | `permitAll` |
+| 4 | `POST /accounts` — tạo tài khoản (tên, email, SĐT) | `permitAll`. Tự tạo `Balance` = 0 cùng transaction |
 
-### Tuần 1+2 · Ngày 2-3 — Quản lý thẻ
-
-| # | Việc | Ràng buộc |
-|---|---|---|
-| 6 | `GET /accounts/{id}/cards` — liệt kê thẻ theo accountId | |
-| 7 | `POST /accounts/{id}/cards` — tạo thẻ | **Chỉ tạo được nếu tài khoản đã tồn tại** |
-| 8 | `DELETE /cards/{id}` — xoá thẻ | **Chỉ xoá nếu thẻ không có giao dịch đang chờ xử lý** |
-
-### Tuần 1+2 · Ngày 3 — Quản lý số dư
+### Quản lý tài khoản
 
 | # | Việc | Ràng buộc |
 |---|---|---|
-| 9 | `GET /accounts/{id}/balance` | |
-| 10 | `POST /balance/deposit` — thêm tiền | amount > 0 |
-| 11 | `POST /balance/withdraw` — trừ tiền | **Kiểm tra số dư khả dụng** + thẻ phải hợp lệ |
-| 12 | `GlobalExceptionHandler` | 404 / 400, body lỗi thống nhất |
+| 5 | `GET /accounts/me` — chi tiết | Trả kèm balance |
+| 6 | `PUT /accounts/me` — cập nhật | **Chỉ** email hoặc SĐT |
+| 7 | `DELETE /accounts/me` | **Chỉ xoá nếu không có thẻ liên kết VÀ số dư = 0** |
+| 8 | `GlobalExceptionHandler` | 404 / 400, body lỗi thống nhất |
 
-### Tuần 1+2 · Ngày 4-5 — Spring Security + JWT
+### Quản lý thẻ
 
-| # | Việc |
-|---|---|
-| 13 | `POST /auth/login`, `JwtUtil`, `JwtAuthenticationFilter`, `SecurityConfig` |
-| 14 | **Refactor toàn bộ mục 2-11**: bỏ `accountId` khỏi body/param, lấy từ JWT (§5.1) |
+| # | Việc | Ràng buộc |
+|---|---|---|
+| 9 | `GET /accounts/me/cards` — liệt kê thẻ | |
+| 10 | `POST /accounts/me/cards` — tạo thẻ | **Chỉ tạo được nếu tài khoản đã tồn tại** |
+| 11 | `DELETE /cards/{id}` — xoá thẻ | **Chỉ chặn nếu thẻ còn giao dịch `PENDING`** |
+
+### Quản lý số dư
+
+| # | Việc | Ràng buộc |
+|---|---|---|
+| 12 | `GET /accounts/me/balance` | |
+| 13 | `POST /balance/deposit` — thêm tiền | amount > 0, không cần thẻ |
+| 14 | `POST /balance/withdraw` — trừ tiền | **Kiểm tra số dư khả dụng** + thẻ phải hợp lệ (§1.2) |
 
 ### Chuẩn bị — Cài Redis, ActiveMQ, Docker
 
@@ -631,15 +647,15 @@ Hai chỗ hay sập:
 |---|---|
 | 15 | `docker compose up -d` cho postgres + redis + activemq, kiểm tra kết nối được |
 
-### Tuần 3 · Ngày 1 — Spring Cache + Redis
+### Spring Cache + Redis
 
 | # | Việc |
 |---|---|
-| 16 | Cache chi tiết account (§7) |
+| 16 | Cache chi tiết account (§8) |
 | 17 | Cache số dư, cập nhật ngay khi deposit/withdraw, TTL 10 phút |
 | 18 | **Postman collection** — mỗi API ≥1 case thành công + ≥1 case thất bại |
 
-### Tuần 3 · Ngày 2-3 — ActiveMQ
+### ActiveMQ
 
 | # | Việc |
 |---|---|
@@ -648,7 +664,7 @@ Hai chỗ hay sập:
 | 21 | `notification-service`: consume → log `"Payment confirmed for paymentId: 12345"` |
 | 22 | `bank-service`: `POST /payments` → tạo Transaction PENDING + hold tiền → gọi HTTP sang payment-service |
 
-### Tuần 3 · Ngày 4 — Docker
+### Docker
 
 | # | Việc |
 |---|---|
@@ -658,7 +674,7 @@ Hai chỗ hay sập:
 | 26 | Đổi `VITE_API_BASE_URL` và origin CORS sang tên container thay vì `localhost` |
 | 27 | `docker compose up --build` chạy trọn bộ, chạy lại Postman + bấm thử UI phải pass |
 
-### Tuần 3 · Ngày 5 — Unit test
+### Unit test
 
 | # | Việc |
 |---|---|
@@ -667,28 +683,28 @@ Hai chỗ hay sập:
 
 ---
 
-## 10. Lộ trình
+## 11. Thứ tự thực hiện
 
-| Tuần | Ngày | Backend | Frontend (song song) |
-|---|---|---|---|
-| 1+2 | 1-2 | Khởi động + Quản lý tài khoản | Đọc Figma, dựng Vite, layout chung, login/đăng ký |
-| 1+2 | 2-3 | Quản lý thẻ | Dashboard + màn tài khoản (dữ liệu giả) |
-| 1+2 | 3 | Quản lý số dư | Màn thẻ (dữ liệu giả) |
-| 1+2 | 4-5 | Spring Security + JWT | Màn số dư. **Backend chốt xong `/accounts/me` mới nối API thật** |
-| — | — | Cài Redis / ActiveMQ / Docker | Màn thanh toán, hiển thị lỗi, Dockerfile + nginx |
-| 3 | 1 | Spring Cache + Redis + Postman | |
-| 3 | 2-3 | ActiveMQ — 2 service riêng | |
-| 3 | 4 | Docker — 4 image (3 backend + 1 frontend) | |
-| 3 | 5 | Unit test | |
+Theo thứ tự backlog ở §10.
 
 ---
 
-## 11. Quy ước Git (đề bài yêu cầu)
+## 12. Quy ước Git (đề bài yêu cầu)
 
 > *"Sử dụng GitLab, đẩy lên git theo từng chức năng, commit theo chuẩn, rõ ràng"*
 
-- Repo trên **GitLab**, `git init` + push **ngay ngày đầu**, trước khi viết dòng code nào.
-- **Mỗi mục backlog ở §9 = 1 commit.** Không gom nhiều chức năng vào một commit.
+### Lệch đề bài có chủ ý: dùng GitHub
+
+Đề bài ghi **GitLab**, nhưng repo thực tế đặt ở **GitHub**: `github.com/huong-1406/bank-service`.
+
+**Đã chốt dùng GitHub.** Hai vế còn lại của yêu cầu — *đẩy theo từng chức năng* và *commit theo chuẩn* — vẫn giữ nguyên, và đó mới là phần thể hiện kỹ năng.
+
+Nếu người chấm bắt buộc đúng GitLab thì xử lý mất khoảng 5 phút: tạo repo GitLab, `git remote set-url origin <url-mới>`, `git push`. Toàn bộ lịch sử commit giữ nguyên, không mất gì.
+
+### Quy ước commit
+
+- `git init` + push **ngay từ đầu**, trước khi viết dòng code nào.
+- **Mỗi mục backlog ở §10 = 1 commit.** Không gom nhiều chức năng vào một commit.
 - Conventional Commits:
 
 ```
@@ -702,57 +718,56 @@ chore(docker): them Dockerfile cho bank-service
 
 ---
 
-## 12. Nếu đổi giả định
+## 13. Nếu đổi giả định
 
-### 12.1 Nếu chọn monolith thay vì 3 service (đổi A1)
+### 13.1 Nếu chọn monolith thay vì 3 service (đổi A1)
 
 | Mục | Thay đổi |
 |---|---|
-| §1, §3 | Bỏ multi-module. `payment` và `notification` thành 2 package trong `bank-service`: `messaging/payment/PaymentProducer`, `messaging/notification/NotificationListener` |
-| §6 | Bỏ bước gọi HTTP (3). Service gọi thẳng `PaymentProducer.send()` |
-| §9 mục 19, 20, 22 | Gộp lại, giảm ~0.5 ngày |
-| §9 mục 23, 24 | Chỉ 1 Dockerfile thay vì 3 |
+| §2, §4 | Bỏ multi-module. `payment` và `notification` thành 2 package trong `bank-service`: `messaging/payment/PaymentProducer`, `messaging/notification/NotificationListener` |
+| §7 | Bỏ bước gọi HTTP (3). Service gọi thẳng `PaymentProducer.send()` |
+| §10 mục 19, 20, 22 | Gộp lại thành một mục |
+| §10 mục 23, 24 | Chỉ 1 Dockerfile thay vì 3 |
 | **Rủi ro** | Lệch câu *"tạo thêm 2 service riêng biệt"* của đề bài |
 
-### 12.2 Nếu quay lại Thymeleaf thay vì React (đổi A2)
+### 13.2 Nếu quay lại Thymeleaf thay vì React (đổi A2)
 
 | Mục | Thay đổi |
 |---|---|
-| §1, §3 | Bỏ hẳn thư mục `frontend/`. Thêm lại `resources/templates/` + `resources/static/` + `ViewController` vào `bank-service` |
-| §8.0 | Bỏ toàn bộ stack Node (Vite, React Router, Axios, Context) |
-| §8.2 (1) | **Bỏ được CORS** — cùng origin, không còn vấn đề preflight |
-| §8.2 (2)(3) | Token chuyển sang **HttpOnly cookie**; `JwtAuthenticationFilter` phải đọc được cả header lẫn cookie |
-| §8.5 | Bỏ nginx và build arg — Thymeleaf nằm chung 1 container với backend |
-| §9 mục 24, 26 | Bỏ, còn 3 Dockerfile thay vì 4 |
+| §2, §4 | Bỏ hẳn thư mục `frontend/`. Thêm lại `resources/templates/` + `resources/static/` + `ViewController` vào `bank-service` |
+| §9.1 | Bỏ toàn bộ stack Node (Vite, React Router, Axios, Context) |
+| §9.3 (1) | **Bỏ được CORS** — cùng origin, không còn vấn đề preflight |
+| §9.3 (2)(3) | Token chuyển sang **HttpOnly cookie**; `JwtAuthenticationFilter` phải đọc được cả header lẫn cookie |
+| §9.6 | Bỏ nginx và build arg — Thymeleaf nằm chung 1 container với backend |
+| §10 mục 24, 26 | Bỏ, còn 3 Dockerfile thay vì 4 |
 | **Đánh đổi** | Ít hạ tầng hơn, không CORS, chỉ 1 stack. Nhưng khó bám Figma sát, và trải nghiệm kém hơn SPA |
 
 ---
 
-## 13. Rủi ro
+## 14. Rủi ro
 
 | Rủi ro | Mức | Giảm thiểu |
 |---|---|---|
-| Mất source (đã xảy ra 1 lần) | Cao | Push GitLab **ngày đầu tiên**, commit sau mỗi mục §9 |
-| Mục 14 (refactor JWT) làm vỡ 11 endpoint đã viết | Cao | Commit riêng; viết Postman **sau** mục 14 |
-| Frontend chờ backend → dồn việc tuần 2 | Cao | Dựng UI bằng dữ liệu giả trước, nối API sau |
-| Danh sách màn ở §8.1 lệch Figma | Trung bình | Mở Figma đối chiếu **ngay ngày 1**, đừng để tới tuần 2 |
-| **CORS chặn frontend** — Postman chạy được, trình duyệt thì không | **Cao** | Cấu hình CORS trong `SecurityConfig`, cho `OPTIONS` qua không cần token (§8.2) |
-| Nối API trước mục 14 → phải sửa lại toàn bộ `api/*.js` | Cao | Dùng dữ liệu giả cho tới khi backend chốt xong URL `/accounts/me` (§8.4) |
-| F5 trang con bị 404 sau khi lên nginx | Trung bình | `try_files $uri /index.html` trong `nginx.conf` (§8.5) |
-| `VITE_API_BASE_URL` sai vì truyền lúc chạy thay vì lúc build | Trung bình | Truyền qua **build arg** của Docker, không phải `environment` (§8.5) |
-| `notification-service` xử lý message 2 lần | Trung bình | Listener idempotent (§6.1) |
-| `payment-service` chết → tiền kẹt ở `holdBalance` | Trung bình | Timeout + đánh `FAILED` + hoàn tiền (§6.1) |
-| Cấu hình `localhost` không chạy được trong Docker | Trung bình | Dùng biến env cho host ngay từ đầu, đừng để tới ngày 4 tuần 3 |
+| Mất source (đã xảy ra 1 lần) | Cao | Push GitHub **ngay từ đầu**, commit sau mỗi mục §10 (§12) |
+| Refactor JWT giữa chừng làm vỡ các endpoint đã viết | Cao | ✅ Đã tránh — JWT làm ngay mục 2 (§10), viết thẳng `/accounts/me` |
+| Frontend chờ backend → dồn việc về cuối | Cao | Dựng UI bằng dữ liệu giả trước, nối API sau |
+| Làm thừa theo Figma → phình khối lượng | Trung bình | ✅ Đã chốt phạm vi = đúng đề bài (§1.1 giả định A3). Gặp màn Figma ngoài phạm vi thì bỏ, không tự thêm API |
+| **CORS chặn frontend** — Postman chạy được, trình duyệt thì không | **Cao** | Cấu hình CORS trong `SecurityConfig`, cho `OPTIONS` qua không cần token (§9.3) |
+| F5 trang con bị 404 sau khi lên nginx | Trung bình | `try_files $uri /index.html` trong `nginx.conf` (§9.6) |
+| `VITE_API_BASE_URL` sai vì truyền lúc chạy thay vì lúc build | Trung bình | Truyền qua **build arg** của Docker, không phải `environment` (§9.6) |
+| `notification-service` xử lý message 2 lần | Trung bình | Listener idempotent (§7.1) |
+| `payment-service` chết → tiền kẹt ở `holdBalance` | Trung bình | Timeout + đánh `FAILED` + hoàn tiền (§7.1) |
+| Cấu hình `localhost` không chạy được trong Docker | Trung bình | Dùng biến env cho host ngay từ đầu, đừng để tới lúc dựng Docker |
 | `ddl-auto: update` không xoá cột cũ | Thấp | Drop DB làm lại khi entity đổi nhiều, vì đang giai đoạn dev |
 
 ---
 
-## 14. Các bước bắt đầu dự án (Ngày 0)
+## 15. Các bước bắt đầu dự án
 
-> Mục tiêu ngày 0: **không viết một dòng nghiệp vụ nào**, chỉ dựng khung sao cho `mvn compile` xanh, 4 app khởi động được, hạ tầng chạy, và code đã nằm trên GitLab.
-> Xong hết mục này mới bắt đầu backlog mục 1 ở §9.
+> Mục tiêu bước chuẩn bị: **không viết một dòng nghiệp vụ nào**, chỉ dựng khung sao cho `mvn compile` xanh, 4 app khởi động được, hạ tầng chạy, và code đã nằm trên GitHub.
+> Xong hết mục này mới bắt đầu backlog mục 1 ở §10.
 
-### 14.1 Kiểm tra máy
+### 15.1 Kiểm tra máy
 
 | Cần có | Kiểm tra bằng | Yêu cầu |
 |---|---|---|
@@ -764,9 +779,9 @@ chore(docker): them Dockerfile cho bank-service
 
 Thiếu Node thì cài trước, vì bước 14.8 cần.
 
-### 14.2 Dựng lại cây thư mục thành multi-module
+### 15.2 Dựng lại cây thư mục thành multi-module
 
-Hiện tại thư mục đang là **1 module đơn**. Cần chuyển thành cấu trúc §3:
+Hiện tại thư mục đang là **1 module đơn**. Cần chuyển thành cấu trúc §4:
 
 1. Tạo 3 thư mục con: `bank-service/`, `payment-service/`, `notification-service/`, và `frontend/`.
 2. Chuyển `src/` hiện tại vào trong `bank-service/`.
@@ -777,16 +792,19 @@ Hiện tại thư mục đang là **1 module đơn**. Cần chuyển thành cấ
 
 Giữ nguyên tên thư mục gốc cũng được, không bắt buộc đổi thành `bank-system`.
 
-### 14.3 Git + GitLab — làm ngay, đừng để sau
+### 15.3 Git + GitHub — ✅ đã xong
 
-Đề bài yêu cầu GitLab. Và dự án này **đã mất source một lần rồi**.
+Dự án này **đã mất source một lần rồi**, nên đây là việc làm trước tiên. Hiện đã hoàn thành:
 
-1. `git init` tại thư mục gốc.
-2. Bổ sung `.gitignore` — file hiện tại mới chỉ có phần Java, cần thêm: `node_modules/`, `dist/`, `.env.local`, `frontend/.vite/`.
-3. Tạo repo rỗng trên GitLab, `git remote add origin ...`.
-4. Commit đầu tiên và push **ngay bây giờ**, kể cả khi mới chỉ có pom rỗng.
+1. ✅ `git init` tại thư mục gốc.
+2. ✅ Tạo repo và `git remote add origin https://github.com/huong-1406/bank-service.git` *(GitHub thay vì GitLab — lý do ở §12)*.
+3. ✅ Commit đầu tiên `48058af` và push lên `origin/main`.
+4. ⬜ Bổ sung `.gitignore` — file hiện tại mới chỉ có phần Java, cần thêm: `node_modules/`, `dist/`, `.env.local`, `frontend/.vite/`.
+5. ⬜ `chmod +x mvnw` kèm `git update-index --chmod=+x mvnw` — file wrapper đang thiếu quyền thực thi và đã commit ở trạng thái đó, nên ai clone về cũng không chạy được `./mvnw`.
 
-### 14.4 Khởi động hạ tầng
+> Commit đầu gom cả 13 file vào một `"Initial commit"`. Chấp nhận được vì mới chỉ là khung và tài liệu, nhưng **từ đây trở đi mỗi chức năng là một commit riêng** theo Conventional Commits (§12).
+
+### 15.4 Khởi động hạ tầng
 
 ```
 docker compose up -d postgres redis activemq
@@ -800,9 +818,9 @@ Kiểm tra từng cái:
 | Redis | `docker exec -it bank-service-redis redis-cli ping` | `PONG` |
 | ActiveMQ | mở `http://localhost:8161` | vào được, login `admin/admin` |
 
-> Giao diện ActiveMQ ở 8161 sẽ dùng nhiều ở tuần 3 để nhìn message vào/ra queue (§6).
+> Giao diện ActiveMQ ở 8161 sẽ dùng nhiều lúc làm phần ActiveMQ, để nhìn message vào/ra queue (§7).
 
-### 14.5 Chia dependency cho từng module
+### 15.5 Chia dependency cho từng module
 
 Đây là chỗ hay làm ẩu — nhét hết mọi thứ vào mọi module.
 
@@ -815,14 +833,14 @@ Kiểm tra từng cái:
 
 Hai điểm đáng chú ý:
 
-- **`bank-service` KHÔNG cần `activemq`.** Nó nói chuyện với `payment-service` bằng HTTP, không đụng queue. Chỉ thêm activemq vào đây nếu sau này làm phần mở rộng §6.2 (queue phản hồi).
-- **`notification-service` vẫn nên có `web`** dù không phục vụ HTTP — để có endpoint health cho Docker healthcheck ở tuần 3.
+- **`bank-service` KHÔNG cần `activemq`.** Nó nói chuyện với `payment-service` bằng HTTP, không đụng queue. Chỉ thêm activemq vào đây nếu sau này làm phần mở rộng §7.2 (queue phản hồi).
+- **`notification-service` vẫn nên có `web`** dù không phục vụ HTTP — để có endpoint health cho Docker healthcheck.
 
-### 14.6 Sửa `application.yml` theo biến môi trường
+### 15.6 Sửa `application.yml` theo biến môi trường
 
 File hiện tại đang nướng cứng `jdbc:postgresql://localhost:5432/...`. Chạy trong Docker sẽ sai host.
 
-Đổi ngay bây giờ, đừng để tới ngày 4 tuần 3:
+Đổi ngay bây giờ, đừng để tới lúc dựng Docker:
 
 - `localhost` trong URL datasource → `${DB_HOST:localhost}`
 - Redis host đã dùng `${REDIS_HOST:localhost}` rồi, giữ nguyên
@@ -830,7 +848,7 @@ File hiện tại đang nướng cứng `jdbc:postgresql://localhost:5432/...`. 
 
 Rồi tạo thêm `application.yml` cho 2 service mới: `payment-service` port **8081**, `notification-service` port **8082**, cả hai trỏ tới cùng broker.
 
-### 14.7 Chạy thử khung rỗng
+### 15.7 Chạy thử khung rỗng
 
 Mỗi service chỉ cần đúng 1 class `*Application.java` là chạy được.
 
@@ -841,49 +859,67 @@ Mỗi service chỉ cần đúng 1 class `*Application.java` là chạy được
 
 Mốc đạt: cả 3 app khởi động không lỗi, chiếm đúng 3 port 8080/8081/8082. Chưa có API nào cũng không sao.
 
-### 14.8 Khởi tạo frontend React
+### 15.8 Khởi tạo frontend React
 
 ```
 cd frontend
 npm create vite@latest . -- --template react
 npm install
 npm install react-router-dom axios
-npm install @mui/material @emotion/react @emotion/styled   # hoặc tailwind, tùy Figma
+npm install react-bootstrap bootstrap
 npm run dev
 ```
 
+> **Bẫy hay gặp:** cài `react-bootstrap` xong mà quên nhập file CSS thì giao diện vẫn xấu như chưa cài gì. Phải thêm đúng một dòng này vào đầu `src/main.jsx`:
+>
+> ```js
+> import 'bootstrap/dist/css/bootstrap.min.css'
+> ```
+
 Mốc đạt: mở `http://localhost:3000` thấy trang mặc định của Vite.
 
-> Vite mặc định chạy port 5173 — sửa thành 3000 trong `vite.config.js` cho khớp tài liệu, hoặc sửa tài liệu cho khớp Vite. Miễn là **thống nhất một chỗ**, vì con số này còn dùng lại ở cấu hình CORS và Docker.
+> **Chốt port 3000.** Vite mặc định 5173, nên thêm vào `vite.config.js`:
+>
+> ```js
+> export default defineConfig({ plugins: [react()], server: { port: 3000 } })
+> ```
+>
+> Con số này còn dùng lại ở cấu hình CORS (§9.3) và Docker (§9.6) — đã thống nhất là 3000 ở toàn bộ tài liệu.
 
-### 14.9 Đối chiếu Figma — làm trong ngày 0, không để muộn
+### 15.9 Đối chiếu Figma — ✅ đã xong
 
-Mở link Figma ở §0.2, rà lại bảng 10 màn ở §8.1:
+Phạm vi đã chốt bám đề bài (§1.1 giả định A3), danh sách 10 màn ở §9.2 là cuối cùng. Figma chỉ còn dùng để lấy giao diện.
 
-- Figma có màn nào mà bảng thiếu không?
-- Bảng có màn nào Figma không có không?
-- Có màn nào cần API mà đề bài **không hề yêu cầu** không? (ví dụ lịch sử giao dịch)
+Link Figma của đề bài: <https://www.figma.com/design/bTDzXJpTuMwuqv2S4vKPRy/Banking--Copy-?node-id=0-1&p=f>
 
-Câu hỏi thứ ba quan trọng nhất. Nếu Figma có màn cần API ngoài phạm vi đề bài, phải quyết định ngay: làm thêm API đó, hay bỏ màn đó. Phát hiện ở tuần 2 thì trở tay không kịp.
+Việc còn lại — mở Figma và lấy đúng **4 thứ**:
 
-Cập nhật lại §8.1 sau khi rà xong.
+| Lấy gì | Dùng vào đâu |
+|---|---|
+| Bảng màu (màu chính, màu nền, màu cảnh báo) | Ghi đè biến CSS của Bootstrap (`--bs-primary`...) |
+| Font chữ và cỡ chữ | Theme |
+| Bố cục sidebar + header của dashboard | Layout dùng chung |
+| Kiểu nút, ô nhập, thẻ (card) | Component dùng lại |
 
-### 14.10 Checklist hoàn thành ngày 0
+**Không** lấy từ Figma: luồng nghiệp vụ và danh sách màn — hai thứ đó đã chốt theo đề bài rồi.
+
+### 15.10 Checklist hoàn thành bước chuẩn bị
 
 - [ ] `java -version` ra 21, `node -v` ra 20+
-- [ ] Cây thư mục đúng §3, có 4 thư mục con
+- [ ] Cây thư mục đúng §4, có 4 thư mục con
 - [ ] `./mvnw clean compile` xanh cả 3 module
 - [ ] 3 app backend khởi động được, đúng port 8080/8081/8082
 - [ ] `npm run dev` lên được frontend
 - [ ] 3 container hạ tầng healthy, vào được ActiveMQ console
 - [ ] `.gitignore` đã có `node_modules/` và `dist/`
-- [ ] Đã push lên GitLab
-- [ ] Đã đối chiếu Figma, §8.1 được cập nhật
+- [x] Đã push lên GitHub
+- [ ] `mvnw` có quyền thực thi (`git update-index --chmod=+x`)
+- [x] Đã đối chiếu Figma → chốt bám đề bài, §9.2 đã cập nhật
 
-### 14.11 Sau ngày 0 thì làm gì
+### 15.11 Sau bước chuẩn bị thì làm gì
 
-Bắt đầu **backlog mục 1** ở §9 — 4 entity + 4 repository. Từ đây trở đi mỗi mục backlog là 1 commit, theo quy ước ở §11.
+Bắt đầu **backlog mục 1** ở §10 — 4 entity + 4 repository. Từ đây trở đi mỗi mục backlog là 1 commit, theo quy ước ở §12.
 
-Frontend chạy song song theo lộ trình §8.3, dùng dữ liệu giả, **chưa nối API thật** cho tới khi backend xong mục 14 (§8.4).
+Frontend chạy song song theo lộ trình §9.4, dùng dữ liệu giả trước, nối API thật khi backend xong nhóm tương ứng (§9.5).
 
-> Thư mục backup `/home/toan/bank-service-source-backup-20260924/` giữ lại cho tới khi đã push GitLab thành công, sau đó xoá được.
+> Thư mục backup `/home/toan/bank-service-source-backup-20260924/` — đã push GitHub thành công (commit `48058af`), nên **xoá được rồi**.
