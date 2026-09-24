@@ -390,9 +390,11 @@ Bất đồng bộ. Trả về **`202`**, không phải `200` — vì lúc trả
 | Thẻ không `ACTIVE` | `400 CARD_NOT_ACTIVE` |
 | Thẻ không phải của mình | `404 CARD_NOT_FOUND` |
 
-**Việc xảy ra bên trong:** ghi `Transaction` = `PENDING` → chuyển `amount` từ `availableBalance` sang `holdBalance` → gọi HTTP sang `payment-service` → trả `202` ngay.
+**Việc xảy ra bên trong:** ghi `Transaction` = `PENDING` → chuyển `amount` từ `availableBalance` sang `holdBalance` → gọi HTTP sang `payment-service` → nhận `202` thì đánh `Transaction` = `COMPLETED` và trừ `holdBalance` → trả `202` cho client.
 
-> `payment-service` chết thì đánh giao dịch `FAILED` và hoàn tiền từ `holdBalance` về `availableBalance`.
+> `payment-service` chết hoặc timeout thì đánh giao dịch `FAILED` và hoàn tiền từ `holdBalance` về `availableBalance`.
+>
+> Không có bước nào khác chốt `COMPLETED` — `notification-service` chỉ log, không đụng vào DB (`ARCHITECTURE2.md` §7.2).
 
 ---
 
@@ -452,14 +454,19 @@ Theo `DATABASE.md` §10. Mật khẩu chung: `password123`.
 
 ### Case thất bại bắt buộc có trong Postman
 
+Đề bài: **mỗi API ít nhất 1 case thành công + 1 case thất bại.** Bảng dưới phủ đủ 12/12 API.
+
 | API | Case fail |
 |---|---|
 | 1 | Sai mật khẩu → 401 |
 | 2 | Email trùng → 409 |
 | 3 | Không gửi token → 401 |
+| 4 | Email sai định dạng → 400 |
 | 5 | Xoá tài khoản A (còn thẻ) → 400 |
+| 6 | Token hết hạn → 401 |
 | 7 | `expiryDate` quá khứ → 400 |
 | 8 | Xoá thẻ của người khác → 404 |
+| 9 | Token sai chữ ký → 401 |
 | 10 | `amount` = 0 → 400 |
 | 11 | Rút bằng thẻ `INACTIVE` → 400 |
 | 11 | Rút quá số dư → 400 |
