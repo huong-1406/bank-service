@@ -14,11 +14,19 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+    # Chạy schema-extra.sql và data.sql SAU khi Hibernate tạo bảng
+    defer-datasource-initialization: true
     show-sql: true
     properties:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema-extra.sql
+      data-locations: classpath:data.sql
 
   data:
     redis:
