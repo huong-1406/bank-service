@@ -24,3 +24,9 @@ target/
 
 ### Environment ###
 .env
+
+### Frontend ###
+node_modules/
+dist/
+.env.local
+frontend/.vite/
