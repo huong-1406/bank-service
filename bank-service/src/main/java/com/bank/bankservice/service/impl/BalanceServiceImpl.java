@@ -1,5 +1,6 @@
 package com.bank.bankservice.service.impl;
 
+import com.bank.bankservice.config.RedisConfig;
 import com.bank.bankservice.dto.request.DepositRequest;
 import com.bank.bankservice.dto.request.WithdrawRequest;
 import com.bank.bankservice.dto.response.BalanceResponse;
@@ -15,6 +16,9 @@ import com.bank.bankservice.repository.CardRepository;
 import com.bank.bankservice.repository.TransactionRepository;
 import com.bank.bankservice.service.BalanceService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +33,18 @@ public class BalanceServiceImpl implements BalanceService {
     private final BalanceRepository balanceRepository;
     private final CardRepository cardRepository;
     private final TransactionRepository transactionRepository;
+    private final CacheManager cacheManager;
 
     @Override
+    @Cacheable(cacheNames = RedisConfig.BALANCE_CACHE, key = "#accountId")
     @Transactional(readOnly = true)
     public BalanceResponse getBalance(Long accountId) {
         return BalanceResponse.from(findBalance(accountId));
     }
 
+    // Response của API xem tài khoản có kèm số dư → số dư đổi thì phải xoá cache account
     @Override
+    @CacheEvict(cacheNames = RedisConfig.ACCOUNT_CACHE, key = "#accountId")
     @Transactional
     public BalanceResponse deposit(Long accountId, DepositRequest request) {
         Balance balance = findBalance(accountId);
@@ -47,10 +55,12 @@ public class BalanceServiceImpl implements BalanceService {
                 request.currency(), TransactionType.DEPOSIT);
 
         // Cột version: nếu có lệnh khác ghi cùng lúc thì commit thất bại → 409 CONCURRENT_UPDATE
+        updateBalanceCache(balance);
         return BalanceResponse.from(balance, transaction.getId());
     }
 
     @Override
+    @CacheEvict(cacheNames = RedisConfig.ACCOUNT_CACHE, key = "#accountId")
     @Transactional
     public BalanceResponse withdraw(Long accountId, WithdrawRequest request) {
         Card card = cardRepository.findByIdAndAccountId(request.cardId(), accountId)
@@ -69,7 +79,18 @@ public class BalanceServiceImpl implements BalanceService {
 
         Transaction transaction = saveCompletedTransaction(balance, card, request.amount(),
                 request.currency(), TransactionType.WITHDRAW);
+        updateBalanceCache(balance);
         return BalanceResponse.from(balance, transaction.getId());
+    }
+
+    // Không dùng @CachePut: nó lưu nguyên kết quả trả về, mà kết quả nạp/rút có transactionId,
+    // lần sau xem số dư sẽ hiện transactionId. Nên tự ghi bản không có transactionId.
+    // Cache transaction-aware: lệnh ghi này chỉ thực sự chạy sau khi commit thành công.
+    private void updateBalanceCache(Balance balance) {
+        var cache = cacheManager.getCache(RedisConfig.BALANCE_CACHE);
+        if (cache != null) {
+            cache.put(balance.getAccountId(), BalanceResponse.from(balance));
+        }
     }
 
     private Transaction saveCompletedTransaction(Balance balance, Card card, BigDecimal amount,

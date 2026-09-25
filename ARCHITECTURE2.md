@@ -496,8 +496,14 @@ Chỉ áp dụng trong `bank-service`.
 
 | Đối tượng cache | Annotation | Evict khi nào |
 |---|---|---|
-| Chi tiết account | `@Cacheable("account")` | `@CacheEvict` khi update / delete account |
-| Số dư | `@Cacheable("balance")` | `@CachePut` ngay sau deposit/withdraw |
+| Chi tiết account | `@Cacheable("account")` | `@CacheEvict` khi update / delete account, **và khi deposit / withdraw** — response có kèm số dư |
+| Số dư | `@Cacheable("balance")` | Ghi số mới ngay sau deposit/withdraw qua `CacheManager` · `@CacheEvict` khi delete account |
+
+> **Không dùng `@CachePut` cho số dư.** `@CachePut` lưu nguyên kết quả trả về, mà response nạp/rút có `transactionId` — lần sau xem số dư sẽ hiện cả `transactionId`. Nên tự ghi bản không có `transactionId`.
+>
+> **Cache transaction-aware:** ghi / xoá cache chỉ chạy sau khi commit thành công. Commit lỗi `409` thì cache giữ nguyên.
+>
+> **Redis lỗi thì bỏ qua cache**, đọc thẳng database — Redis chỉ là bản sao. Chi tiết: `bank-service/README.md` §4.
 
 TTL: **10 phút** (`spring.cache.redis.time-to-live: 600000`).
 

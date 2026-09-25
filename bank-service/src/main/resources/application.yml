@@ -32,6 +32,9 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
+      # Redis chết thì chỉ chờ 1 giây rồi bỏ qua cache (mặc định chờ 60 giây)
+      timeout: 1s
+      connect-timeout: 1s
 
   cache:
     type: ${CACHE_TYPE:redis}
@@ -44,6 +47,10 @@ spring:
     password: ${ACTIVEMQ_PASSWORD:admin}
 
 management:
+  # Redis chỉ là cache: Redis chết thì API vẫn chạy, nên không tính vào healthcheck của container
+  health:
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:
