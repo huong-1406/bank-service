@@ -106,21 +106,26 @@ Riêng lỗi validate có thêm `fieldErrors`:
 
 **12 API công khai** + 1 API nội bộ.
 
-| # | Method | Path | Token? |
-|---|---|---|---|
-| 1 | POST | `/auth/login` | ❌ |
-| 2 | POST | `/accounts` | ❌ |
-| 3 | GET | `/accounts/me` | ✅ |
-| 4 | PUT | `/accounts/me` | ✅ |
-| 5 | DELETE | `/accounts/me` | ✅ |
-| 6 | GET | `/accounts/me/cards` | ✅ |
-| 7 | POST | `/accounts/me/cards` | ✅ |
-| 8 | DELETE | `/cards/{id}` | ✅ |
-| 9 | GET | `/accounts/me/balance` | ✅ |
-| 10 | POST | `/balance/deposit` | ✅ |
-| 11 | POST | `/balance/withdraw` | ✅ |
-| 12 | POST | `/payments` | ✅ |
-| — | POST | `payment-service:8081/payments` | ❌ nội bộ |
+Mọi đường dẫn đều bắt đầu bằng `http://localhost:8080`.
+
+| # | Method | Path | Làm gì | Token? | Trạng thái |
+|---|---|---|---|---|---|
+| 1 | POST | `/auth/login` | Đăng nhập, nhận token | ❌ | ✅ |
+| 2 | POST | `/accounts` | Đăng ký tài khoản | ❌ | ✅ |
+| 3 | GET | `/accounts/me` | Xem tài khoản | ✅ | ✅ |
+| 4 | PUT | `/accounts/me` | Sửa email / SĐT | ✅ | ✅ |
+| 5 | DELETE | `/accounts/me` | Xoá tài khoản | ✅ | ✅ |
+| 6 | GET | `/accounts/me/cards` | Xem danh sách thẻ | ✅ | ✅ |
+| 7 | POST | `/accounts/me/cards` | Tạo thẻ | ✅ | ✅ |
+| 8 | DELETE | `/cards/{id}` | Xoá thẻ | ✅ | ✅ |
+| 9 | GET | `/accounts/me/balance` | Xem số dư | ✅ | ✅ |
+| 10 | POST | `/balance/deposit` | Nạp tiền | ✅ | ✅ |
+| 11 | POST | `/balance/withdraw` | Rút tiền | ✅ | ✅ |
+| 12 | POST | `/payments` | Thanh toán | ✅ | ⬜ làm cùng ActiveMQ |
+| — | POST | `payment-service:8081/payments` | Nội bộ: bank-service gọi khi thanh toán | ❌ | ⬜ |
+
+**Method:** `GET` = xem · `POST` = tạo mới / thực hiện · `PUT` = sửa · `DELETE` = xoá.
+**Token:** API có ✅ phải gửi header `Authorization: Bearer <token>` — token lấy từ API 1.
 
 ---
 
