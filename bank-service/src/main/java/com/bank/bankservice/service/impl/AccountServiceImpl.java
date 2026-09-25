@@ -1,5 +1,6 @@
 package com.bank.bankservice.service.impl;
 
+import com.bank.bankservice.config.RedisConfig;
 import com.bank.bankservice.dto.request.CreateAccountRequest;
 import com.bank.bankservice.dto.request.UpdateAccountRequest;
 import com.bank.bankservice.dto.response.AccountResponse;
@@ -12,6 +13,9 @@ import com.bank.bankservice.repository.BalanceRepository;
 import com.bank.bankservice.repository.CardRepository;
 import com.bank.bankservice.service.AccountService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,7 +56,9 @@ public class AccountServiceImpl implements AccountService {
         return AccountResponse.from(account);
     }
 
+    // Có trong Redis thì trả luôn, không chạy code bên dưới. Không có thì đọc DB rồi lưu 10 phút
     @Override
+    @Cacheable(cacheNames = RedisConfig.ACCOUNT_CACHE, key = "#accountId")
     @Transactional(readOnly = true)
     public AccountResponse getAccount(Long accountId) {
         Account account = findAccount(accountId);
@@ -60,6 +66,7 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    @CacheEvict(cacheNames = RedisConfig.ACCOUNT_CACHE, key = "#accountId")
     @Transactional
     public AccountResponse updateAccount(Long accountId, UpdateAccountRequest request) {
         Account account = findAccount(accountId);
@@ -82,6 +89,10 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    @Caching(evict = {
+            @CacheEvict(cacheNames = RedisConfig.ACCOUNT_CACHE, key = "#accountId"),
+            @CacheEvict(cacheNames = RedisConfig.BALANCE_CACHE, key = "#accountId")
+    })
     @Transactional
     public void deleteAccount(Long accountId) {
         Account account = findAccount(accountId);

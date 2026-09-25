@@ -32,7 +32,8 @@ src/main/java/com/bank/bankservice/
 │   ├── request/               JSON gửi lên (kèm quy tắc validate)
 │   └── response/              JSON trả về (không bao giờ có password)
 ├── security/       JwtUtil · JwtAuthenticationFilter · SecurityConfig · SecurityUtil
-└── exception/      ErrorCode · BusinessException · ErrorResponse · GlobalExceptionHandler
+├── exception/      ErrorCode · BusinessException · ErrorResponse · GlobalExceptionHandler
+└── config/         RedisConfig · ResilientRedisCacheManager · ResilientCache
 
 src/main/resources/
 ├── application.yml
@@ -79,13 +80,13 @@ account ──1─1── balance         số dư: available (dùng được) +
 |---|---|---|---|---|---|
 | 1 | `POST /auth/login` | ❌ | `AuthController` | `AuthServiceImpl.login` | ✅ |
 | 2 | `POST /accounts` | ❌ | `AccountController` | `AccountServiceImpl.createAccount` | ✅ |
-| 3 | `GET /accounts/me` | ✅ | `AccountController` | `AccountServiceImpl.getAccount` | ✅ (chưa cache) |
+| 3 | `GET /accounts/me` | ✅ | `AccountController` | `AccountServiceImpl.getAccount` | ✅ cache |
 | 4 | `PUT /accounts/me` | ✅ | `AccountController` | `AccountServiceImpl.updateAccount` | ✅ |
 | 5 | `DELETE /accounts/me` | ✅ | `AccountController` | `AccountServiceImpl.deleteAccount` | ✅ |
 | 6 | `GET /accounts/me/cards` | ✅ | `CardController` | `CardServiceImpl.getCards` | ✅ |
 | 7 | `POST /accounts/me/cards` | ✅ | `CardController` | `CardServiceImpl.createCard` | ✅ |
 | 8 | `DELETE /cards/{id}` | ✅ | `CardController` | `CardServiceImpl.deleteCard` | ✅ |
-| 9 | `GET /accounts/me/balance` | ✅ | `BalanceController` | `BalanceServiceImpl.getBalance` | ✅ (chưa cache) |
+| 9 | `GET /accounts/me/balance` | ✅ | `BalanceController` | `BalanceServiceImpl.getBalance` | ✅ cache |
 | 10 | `POST /balance/deposit` | ✅ | `BalanceController` | `BalanceServiceImpl.deposit` | ✅ |
 | 11 | `POST /balance/withdraw` | ✅ | `BalanceController` | `BalanceServiceImpl.withdraw` | ✅ |
 | 12 | `POST /payments` | ✅ | `PaymentController` | `PaymentServiceImpl.pay` | ⬜ làm cùng ActiveMQ |
@@ -139,9 +140,58 @@ Request / response đầy đủ của từng API: `../API.md` §5.
 
 ---
 
-## 4. Thêm API mới vào đâu
+## 4. Redis cache
 
-Làm theo thứ tự từ dưới lên — tầng dưới xong thì tầng trên mới có cái để gọi.
+Cache 2 API được gọi nhiều nhất. Lần đầu đọc PostgreSQL rồi lưu Redis **10 phút**, những lần sau đọc Redis. Chi tiết cơ chế: `../ARCHITECTURE2.md` §8.
+
+| Cache | Key | Lưu khi | Cập nhật / xoá khi |
+|---|---|---|---|
+| `account` | `account::{accountId}` | API 3 xem tài khoản | **Xoá** khi sửa (4), xoá (5), nạp (10), rút (11) — vì response có kèm số dư |
+| `balance` | `balance::{accountId}` | API 9 xem số dư | **Ghi số mới** khi nạp (10), rút (11) · **xoá** khi xoá tài khoản (5) |
+
+| Chỗ | Viết ở |
+|---|---|
+| Đọc cache | `@Cacheable` trên `AccountServiceImpl.getAccount`, `BalanceServiceImpl.getBalance` |
+| Xoá cache | `@CacheEvict` trên `updateAccount`, `deleteAccount`, `deposit`, `withdraw` |
+| Ghi số dư mới | `BalanceServiceImpl.updateBalanceCache` — gọi `CacheManager` thay vì `@CachePut`, vì response nạp/rút có `transactionId` mà response xem số dư thì không |
+| Cấu hình | `config/RedisConfig` — JSON, TTL 10 phút |
+
+### Hai lớp bảo vệ — `config/ResilientRedisCacheManager`
+
+1. **Chỉ ghi / xoá cache sau khi commit thành công.** Commit lỗi (ví dụ `409 CONCURRENT_UPDATE`) thì cache không bị đụng — không có chuyện Redis giữ số dư mà database không có.
+2. **Redis lỗi thì bỏ qua** (`ResilientCache`) — ghi log cảnh báo, đọc thẳng database. API không trả `500`.
+
+> Khi Redis chết, mỗi request **chậm khoảng 2 giây** (chờ tối đa 1 giây lúc đọc cache + 1 giây lúc ghi, `spring.data.redis.timeout`). Redis bật lại thì tự dùng cache lại, không cần khởi động lại `bank-service`.
+>
+> Healthcheck không tính Redis (`management.health.redis.enabled: false`) — Redis chết không làm container báo `unhealthy`.
+
+### Xem cache bằng tay
+
+```bash
+docker exec -it bank-service-redis redis-cli
+KEYS *            # ví dụ: balance::1  account::1
+GET balance::1    # xem nội dung (JSON)
+TTL balance::1    # còn bao nhiêu giây (tối đa 600)
+FLUSHALL          # xoá sạch cache — dữ liệu thật trong PostgreSQL không ảnh hưởng
+```
+
+### Đã thử
+
+| Case | Kết quả |
+|---|---|
+| Xem số dư 2 lần | Lần 1: 1 câu SQL · lần 2: 0 câu SQL |
+| Nạp rồi xem số dư / xem tài khoản | Ra số mới ngay, xem số dư không có `transactionId` |
+| Sửa email rồi xem | Email mới ngay |
+| Rút tiền lỗi | Cache không đổi |
+| 10 lệnh nạp cùng lúc | 2 thành công, 8 bị `409` · Redis khớp database |
+| Xoá tài khoản | Cả 2 key bị xoá · token cũ nhận `404` |
+| Tắt Redis | Mọi API vẫn `200` · bật lại tự dùng cache |
+
+---
+
+## 5. Thêm API mới vào đâu
+
+Làm theo thứ tự từ dưới lên — tầng dưới xong thì tầng trên mới có cái để gọi. API mới làm đổi dữ liệu đang được cache thì xem thêm §4.
 
 | Bước | Việc | File |
 |---|---|---|
@@ -163,7 +213,7 @@ Làm theo thứ tự từ dưới lên — tầng dưới xong thì tầng trên
 
 ---
 
-## 5. Lưu ý khi sửa code
+## 6. Lưu ý khi sửa code
 
 | Chỗ | Vì sao |
 |---|---|
@@ -172,10 +222,12 @@ Làm theo thứ tự từ dưới lên — tầng dưới xong thì tầng trên
 | `schema-extra.sql` dùng `DROP CONSTRAINT IF EXISTS` + `ADD` | Spring tách script theo `;` nên không dùng được khối `DO $$`. Viết thế này để khởi động lại không lỗi |
 | `data.sql` dùng `ON CONFLICT` / `NOT EXISTS` | Chạy mỗi lần khởi động — không được chèn trùng |
 | Thẻ hợp lệ phải kiểm tra **mỗi lần dùng** | Hạn thẻ tự đổi theo ngày, không có lệnh ghi nào |
+| Thêm API ghi làm **đổi số dư hoặc thông tin tài khoản** | Phải xoá / cập nhật cache (§4). Quên thì API xem trả dữ liệu cũ tới 10 phút |
+| Không gọi method có `@Cacheable` từ **trong cùng class** | Cache hoạt động qua proxy — gọi nội bộ thì bỏ qua cache |
 
 ---
 
-## 6. Chạy và thử
+## 7. Chạy và thử
 
 ```bash
 # Từ thư mục gốc — dựng lại riêng bank-service
@@ -215,11 +267,10 @@ Mật khẩu chung: `Test@1234`.
 
 ---
 
-## 7. Còn phải làm
+## 8. Còn phải làm
 
 | Việc | Backlog `ARCHITECTURE2.md` §10 |
 |---|---|
-| Redis cache cho API 3 và 9, cập nhật ngay khi nạp / rút | mục 16, 17 |
 | API 12 thanh toán + `PaymentClient` gọi `payment-service` | mục 22 |
 | Postman collection — mỗi API ≥ 1 case thành công + 1 case thất bại | mục 18 |
 | Unit test JUnit5 + Mockito — 2 test cho mỗi API | mục 28 |
