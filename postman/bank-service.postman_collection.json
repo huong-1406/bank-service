@@ -1,0 +1,1645 @@
+{
+  "info": {
+    "_postman_id": "2b5dc5fb-92ae-543d-b508-c31c5c1b1e6a",
+    "name": "bank-service",
+    "description": "12 API của bank-service. Mỗi API có ít nhất 1 case thành công và 1 case thất bại.\n\nChạy: Import file → chuột phải collection → Run. Chạy theo thứ tự từ trên xuống.\nMỗi lần chạy tự đăng ký một tài khoản mới rồi xoá ở cuối, không đụng vào dữ liệu mẫu A, B, C, D.\nCần chạy trước: docker compose up -d",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "badToken",
+      "value": "token-sai"
+    },
+    {
+      "key": "email",
+      "value": ""
+    },
+    {
+      "key": "phone",
+      "value": ""
+    },
+    {
+      "key": "newPhone",
+      "value": ""
+    },
+    {
+      "key": "token",
+      "value": ""
+    },
+    {
+      "key": "aToken",
+      "value": ""
+    },
+    {
+      "key": "cToken",
+      "value": ""
+    },
+    {
+      "key": "dToken",
+      "value": ""
+    },
+    {
+      "key": "cardId",
+      "value": ""
+    },
+    {
+      "key": "aCardId",
+      "value": ""
+    },
+    {
+      "key": "cCardId",
+      "value": ""
+    },
+    {
+      "key": "dCardId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Đăng ký và đăng nhập (API 1, 2)",
+      "item": [
+        {
+          "name": "API 2 ✅ Đăng ký tài khoản mới",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const t = Date.now().toString();",
+                  "pm.collectionVariables.set(\"email\", \"pm\" + t + \"@test.com\");",
+                  "pm.collectionVariables.set(\"phone\", \"08\" + t.slice(-8));",
+                  "pm.collectionVariables.set(\"newPhone\", \"07\" + t.slice(-8));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Không trả mật khẩu\", () => pm.expect(pm.response.json()).to.not.have.property(\"password\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "description": "Mỗi lần chạy tạo email và SĐT mới, nên chạy lại bao nhiêu lần cũng được.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Postman Test\",\n  \"email\": \"{{email}}\",\n  \"phoneNumber\": \"{{phone}}\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 2 ❌ Trùng email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Mã lỗi EMAIL_ALREADY_EXISTS\", () => pm.expect(pm.response.json().code).to.eql(\"EMAIL_ALREADY_EXISTS\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"Postman Test\",\n  \"email\": \"a@test.com\",\n  \"phoneNumber\": \"0811111111\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 2 ❌ Sai định dạng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi VALIDATION_FAILED\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"customerName\": \"X\",\n  \"email\": \"abc\",\n  \"phoneNumber\": \"123\",\n  \"password\": \"1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 1 ✅ Đăng nhập tài khoản mới",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 1 ❌ Sai mật khẩu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Mã lỗi INVALID_CREDENTIALS\", () => pm.expect(pm.response.json().code).to.eql(\"INVALID_CREDENTIALS\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"sai12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: đăng nhập A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"aToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"a@test.com\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: đăng nhập C (thẻ INACTIVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"cToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"c@test.com\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: đăng nhập D (thẻ hết hạn)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"dToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"d@test.com\",\n  \"password\": \"Test@1234\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Tài khoản (API 3, 4)",
+      "item": [
+        {
+          "name": "API 3 ✅ Xem tài khoản",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Đúng email\", () => pm.expect(pm.response.json().email).to.eql(pm.collectionVariables.get(\"email\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 3 ❌ Không gửi token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Mã lỗi UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 4 ✅ Sửa số điện thoại",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"SĐT đã đổi\", () => pm.expect(pm.response.json().phoneNumber).to.eql(pm.collectionVariables.get(\"newPhone\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNumber\": \"{{newPhone}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 4 ❌ Email đã có người dùng",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Mã lỗi EMAIL_ALREADY_EXISTS\", () => pm.expect(pm.response.json().code).to.eql(\"EMAIL_ALREADY_EXISTS\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"a@test.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Thẻ (API 6, 7)",
+      "item": [
+        {
+          "name": "API 6 ✅ Danh sách thẻ (chưa có thẻ)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Danh sách rỗng\", () => pm.expect(pm.response.json()).to.eql([]));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 6 ❌ Token sai",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Mã lỗi UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{badToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 7 ✅ Tạo thẻ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Thẻ mới ACTIVE\", () => pm.expect(pm.response.json().status).to.eql(\"ACTIVE\"));",
+                  "pm.collectionVariables.set(\"cardId\", pm.response.json().cardId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardType\": \"DEBIT\",\n  \"expiryDate\": \"2031-12-31\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 7 ❌ Ngày hết hạn trong quá khứ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi VALIDATION_FAILED\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardType\": \"DEBIT\",\n  \"expiryDate\": \"2020-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: lấy thẻ của A",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"aCardId\", pm.response.json()[0].cardId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{aToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: lấy thẻ của C",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"cCardId\", pm.response.json()[0].cardId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: lấy thẻ của D",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"dCardId\", pm.response.json()[0].cardId);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/cards",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "cards"
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{dToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Số dư (API 9, 10, 11)",
+      "item": [
+        {
+          "name": "API 9 ✅ Xem số dư",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Số dư ban đầu 0\", () => pm.expect(pm.response.json().availableBalance).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "balance"
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 9 ❌ Không gửi token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 401\", () => pm.response.to.have.status(401));",
+                  "pm.test(\"Mã lỗi UNAUTHORIZED\", () => pm.expect(pm.response.json().code).to.eql(\"UNAUTHORIZED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "balance"
+              ]
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          }
+        },
+        {
+          "name": "API 10 ✅ Nạp 1.000.000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Số dư 1.000.000\", () => pm.expect(pm.response.json().availableBalance).to.eql(1000000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/deposit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "deposit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 10 ❌ Số tiền bằng 0",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi VALIDATION_FAILED\", () => pm.expect(pm.response.json().code).to.eql(\"VALIDATION_FAILED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/deposit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "deposit"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 11 ✅ Rút 200.000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Còn 800.000\", () => pm.expect(pm.response.json().availableBalance).to.eql(800000));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 200000,\n  \"cardId\": {{cardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 11 ❌ Không đủ số dư",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi INSUFFICIENT_BALANCE\", () => pm.expect(pm.response.json().code).to.eql(\"INSUFFICIENT_BALANCE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99999999,\n  \"cardId\": {{cardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 11 ❌ Thẻ INACTIVE (tài khoản C)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi CARD_NOT_ACTIVE\", () => pm.expect(pm.response.json().code).to.eql(\"CARD_NOT_ACTIVE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"cardId\": {{cCardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 11 ❌ Thẻ hết hạn (tài khoản D)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi CARD_NOT_ACTIVE\", () => pm.expect(pm.response.json().code).to.eql(\"CARD_NOT_ACTIVE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "description": "Thẻ của D vẫn ACTIVE nhưng hết hạn 31/01/2020.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"cardId\": {{dCardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{dToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 11 ❌ Thẻ của người khác",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mã lỗi CARD_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"CARD_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"cardId\": {{aCardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Thanh toán (API 12)",
+      "item": [
+        {
+          "name": "API 12 ✅ Thanh toán 300.000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 202\", () => pm.response.to.have.status(202));",
+                  "pm.test(\"Trạng thái COMPLETED\", () => pm.expect(pm.response.json().status).to.eql(\"COMPLETED\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "description": "bank-service giữ tiền, gọi payment-service; notification-service sẽ log \"Payment confirmed for paymentId: ...\".",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 300000,\n  \"cardId\": {{cardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 12 ❌ Không đủ số dư",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi INSUFFICIENT_BALANCE\", () => pm.expect(pm.response.json().code).to.eql(\"INSUFFICIENT_BALANCE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 99999999,\n  \"cardId\": {{cardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 12 ❌ Thẻ hết hạn (tài khoản D)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi CARD_NOT_ACTIVE\", () => pm.expect(pm.response.json().code).to.eql(\"CARD_NOT_ACTIVE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/payments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "payments"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"cardId\": {{dCardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{dToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kiểm tra: số dư còn 500.000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Còn 500.000, không bị giữ\", () => { const b = pm.response.json(); pm.expect(b.availableBalance).to.eql(500000); pm.expect(b.holdBalance).to.eql(0); });"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me",
+                "balance"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Xoá thẻ, xoá tài khoản (API 5, 8)",
+      "item": [
+        {
+          "name": "API 8 ❌ Xoá thẻ của người khác",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mã lỗi CARD_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"CARD_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{aCardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{aCardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 5 ❌ Xoá tài khoản còn thẻ",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Mã lỗi ACCOUNT_HAS_CARDS\", () => pm.expect(pm.response.json().code).to.eql(\"ACCOUNT_HAS_CARDS\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Chuẩn bị: rút hết 500.000",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/balance/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "balance",
+                "withdraw"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500000,\n  \"cardId\": {{cardId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "API 8 ✅ Xoá thẻ của mình",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/cards/{{cardId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "cards",
+                "{{cardId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "API 5 ✅ Xoá tài khoản (không thẻ, số dư 0)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Kiểm tra: tài khoản đã bị xoá",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Mã HTTP 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Mã lỗi ACCOUNT_NOT_FOUND\", () => pm.expect(pm.response.json().code).to.eql(\"ACCOUNT_NOT_FOUND\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/accounts/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "accounts",
+                "me"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
