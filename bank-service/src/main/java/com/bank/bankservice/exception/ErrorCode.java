@@ -21,6 +21,7 @@ public enum ErrorCode {
     EMAIL_ALREADY_EXISTS(HttpStatus.CONFLICT, "Email đã được sử dụng"),
     PHONE_ALREADY_EXISTS(HttpStatus.CONFLICT, "Số điện thoại đã được sử dụng"),
     CONCURRENT_UPDATE(HttpStatus.CONFLICT, "Số dư vừa bị thay đổi bởi giao dịch khác, vui lòng thử lại"),
+    PAYMENT_SERVICE_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "Dịch vụ thanh toán tạm thời không khả dụng, tiền đã được hoàn lại"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi hệ thống");
 
     private final HttpStatus status;

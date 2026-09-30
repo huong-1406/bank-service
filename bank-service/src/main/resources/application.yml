@@ -56,6 +56,11 @@ management:
       exposure:
         include: health
 
+# Địa chỉ payment-service. Trong Docker là http://payment-service:8081
+payment-service:
+  url: ${PAYMENT_SERVICE_URL:http://localhost:8081}
+  timeout: 3s
+
 jwt:
   secret: ${JWT_SECRET:change-this-secret-change-this-secret-change-this-secret}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}

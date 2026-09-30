@@ -105,6 +105,8 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET:-change-this-secret-change-this-secret-change-this-secret}
+      # Không depends_on payment-service: payment-service chết thì bank-service vẫn chạy, chỉ thanh toán báo 503
+      PAYMENT_SERVICE_URL: http://payment-service:8081
     ports:
       - "8080:8080"
     depends_on:
