@@ -61,6 +61,10 @@ payment-service:
   url: ${PAYMENT_SERVICE_URL:http://localhost:8081}
   timeout: 3s
 
+# Địa chỉ frontend được phép gọi API (CORS)
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+
 jwt:
   secret: ${JWT_SECRET:change-this-secret-change-this-secret-change-this-secret}
   expiration-ms: ${JWT_EXPIRATION_MS:3600000}
