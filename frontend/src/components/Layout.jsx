@@ -18,6 +18,7 @@ export default function Layout() {
         <h5 className="text-white mb-4">🏦 Bank Service</h5>
         <Nav className="flex-column flex-grow-1">
           <Nav.Link as={NavLink} to="/dashboard">Tổng quan</Nav.Link>
+          <Nav.Link as={NavLink} to="/profile">Tài khoản</Nav.Link>
         </Nav>
         <button className="btn btn-outline-light btn-sm" onClick={handleLogout}>Đăng xuất</button>
       </aside>
