@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import ProfilePage from './pages/ProfilePage'
 import CardsPage from './pages/CardsPage'
+import TransactionsPage from './pages/TransactionsPage'
 
 // Danh sách các trang. Trang nằm trong PrivateRoute thì phải đăng nhập mới vào được
 export default function App() {
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/cards" element={<CardsPage />} />
+            <Route path="/transactions" element={<TransactionsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

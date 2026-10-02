@@ -20,6 +20,7 @@ export default function Layout() {
           <Nav.Link as={NavLink} to="/dashboard">Tổng quan</Nav.Link>
           <Nav.Link as={NavLink} to="/profile">Tài khoản</Nav.Link>
           <Nav.Link as={NavLink} to="/cards">Thẻ</Nav.Link>
+          <Nav.Link as={NavLink} to="/transactions">Giao dịch</Nav.Link>
         </Nav>
         <button className="btn btn-outline-light btn-sm" onClick={handleLogout}>Đăng xuất</button>
       </aside>
