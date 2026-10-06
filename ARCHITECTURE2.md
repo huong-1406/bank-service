@@ -1,4 +1,4 @@
-  néu gi# Bank Service — Kiến trúc v2 (bám đề bài)
+# Bank Service — Kiến trúc v2 (bám đề bài)
 
 > Tài liệu kiến trúc **duy nhất** của dự án, viết theo đề bài gốc.
 > Hệ thống: **3 service Spring Boot** (`bank-service`, `payment-service`, `notification-service`) + **frontend React** riêng.
